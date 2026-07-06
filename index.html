@@ -47,6 +47,7 @@
   #overlay .play { margin-top: 18px; padding: 12px 26px; border: 2px solid #fff; border-radius: 8px; font-size: 16px; }
   #overlay .err { margin-top: 14px; max-width: 80%; font-size: 12px; color: #ff9b9b; word-break: break-word; }
   #hud { position: fixed; left: 10px; top: 8px; color: #fff; font-size: 12px; text-shadow: 0 1px 2px #000; z-index: 10; pointer-events: none; }
+  #flash { position: fixed; inset: 0; background: #c01010; opacity: 0; pointer-events: none; z-index: 15; transition: opacity 0.12s; }
 </style>
 </head>
 <body>
@@ -65,6 +66,7 @@
   <p class="play">▶ Play</p>
   <p class="err" id="err"></p>
 </div>
+<div id="flash"></div>
 
 <script type="module">
 const errEl = document.getElementById('err');
@@ -154,7 +156,8 @@ function generate() {
   world.fill(AIR);
   for (let x = 0; x < SX; x++) {
     for (let z = 0; z < SZ; z++) {
-      const h = Math.floor(SY / 2 - 4 + fractal(x, z) * 14);
+      // Gentle, mostly-open rolling plains with occasional lakes and hills
+      const h = Math.floor(WATER_LEVEL + 2 + fractal(x, z) * 6 + fractal(x * 0.5 + 100, z * 0.5 + 100) * 4);
       for (let y = 0; y <= h; y++) {
         let b;
         if (y === h) b = h <= WATER_LEVEL + 1 ? SAND : GRASS;
@@ -163,7 +166,8 @@ function generate() {
         setBlock(x, y, z, b);
       }
       for (let y = h + 1; y <= WATER_LEVEL; y++) setBlock(x, y, z, WATER);
-      if (h > WATER_LEVEL + 1 && h < SY - 8 && Math.random() < 0.02) {
+      // Sparse trees on dry grassland only
+      if (h > WATER_LEVEL + 2 && h < SY - 10 && Math.random() < 0.006) {
         const th = 4 + Math.floor(Math.random() * 3);
         for (let i = 1; i <= th; i++) setBlock(x, h + i, z, WOOD);
         const top = h + th;
@@ -280,18 +284,19 @@ const highlight = new THREE.LineSegments(
 highlight.visible = false;
 scene.add(highlight);
 
-function rebuildAt(x, y, z) {
-  const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK);
-  for (const [dx, dz] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
-    const nx = cx + dx, nz = cz + dz;
-    if (nx < 0 || nz < 0 || nx >= CHUNKS_X || nz >= CHUNKS_Z) continue;
-    const key = nx + ',' + nz;
-    const old = chunks.get(key);
-    if (old) { scene.remove(old.opaque, old.transparent); old.opaque.geometry.dispose(); old.transparent.geometry.dispose(); }
-    const c = buildChunk(nx, nz);
-    chunks.set(key, c);
-    scene.add(c.opaque, c.transparent);
-  }
+function rebuildRegion(x0, x1, z0, z1) {
+  const cx0 = Math.floor(x0 / CHUNK), cx1 = Math.floor(x1 / CHUNK);
+  const cz0 = Math.floor(z0 / CHUNK), cz1 = Math.floor(z1 / CHUNK);
+  for (let cx = cx0; cx <= cx1; cx++)
+    for (let cz = cz0; cz <= cz1; cz++) {
+      if (cx < 0 || cz < 0 || cx >= CHUNKS_X || cz >= CHUNKS_Z) continue;
+      const key = cx + ',' + cz;
+      const old = chunks.get(key);
+      if (old) { scene.remove(old.opaque, old.transparent); old.opaque.geometry.dispose(); old.transparent.geometry.dispose(); }
+      const c = buildChunk(cx, cz);
+      chunks.set(key, c);
+      scene.add(c.opaque, c.transparent);
+    }
   refreshMeshes();
 }
 
@@ -358,6 +363,43 @@ function playPlace() {
   const g = audioCtx.createGain(); g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
   o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + 0.1);
 }
+function playHiss() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const n = Math.floor(audioCtx.sampleRate * 0.4);
+  const buf = audioCtx.createBuffer(1, n, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = audioCtx.createBufferSource(); src.buffer = buf;
+  const bp = audioCtx.createBiquadFilter(); bp.type = 'highpass'; bp.frequency.value = 3000;
+  const g = audioCtx.createGain(); g.gain.value = 0.3;
+  src.connect(bp); bp.connect(g); g.connect(sfxGain);
+  src.start(t); src.stop(t + 0.4);
+}
+function playExplosion() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const n = Math.floor(audioCtx.sampleRate * 0.6);
+  const buf = audioCtx.createBuffer(1, n, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 1.5);
+  const src = audioCtx.createBufferSource(); src.buffer = buf;
+  const lp = audioCtx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 800;
+  const g = audioCtx.createGain(); g.gain.value = 0.9;
+  src.connect(lp); lp.connect(g); g.connect(sfxGain);
+  src.start(t); src.stop(t + 0.6);
+  const o = audioCtx.createOscillator(); o.type = 'sine';
+  o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(30, t + 0.5);
+  const og = audioCtx.createGain(); og.gain.setValueAtTime(0.8, t); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+  o.connect(og); og.connect(sfxGain); o.start(t); o.stop(t + 0.6);
+}
+const flashEl = document.getElementById('flash');
+function flashScreen() {
+  if (!flashEl) return;
+  flashEl.style.opacity = '0.55';
+  setTimeout(() => { flashEl.style.opacity = '0'; }, 120);
+}
+
 
 const musicToggleEl = document.getElementById('musicToggle');
 function updateMusicLabel() { musicToggleEl.textContent = (musicOn ? '🔊' : '🔇') + ' Music: ' + (musicOn ? 'ON' : 'OFF'); }
@@ -438,10 +480,11 @@ addEventListener('mousemove', e => {
 // Controls + physics
 // ---------------------------------------------------------------------------
 
-const player = { pos: new THREE.Vector3(SX / 2, SY, SZ / 2), vel: new THREE.Vector3(), onGround: false };
+const player = { pos: new THREE.Vector3(SX / 2, SY, SZ / 2), vel: new THREE.Vector3(), onGround: false, health: 100 };
 for (let y = SY - 1; y > 0; y--) {
   if (SOLID.has(getBlock(Math.floor(player.pos.x), y, Math.floor(player.pos.z)))) { player.pos.y = y + 1; break; }
 }
+const spawnPos = player.pos.clone();
 
 // ---------------------------------------------------------------------------
 // Player character (blocky avatar with a pickaxe) — third person
@@ -500,6 +543,136 @@ function updateCharacter(dt) {
 }
 updateCameraTransform();
 
+// ---------------------------------------------------------------------------
+// Entities: sheep (passive) and creepers (hostile)
+// ---------------------------------------------------------------------------
+function makeCreeper() {
+  const g = new THREE.Group();
+  const mat = c => new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]) });
+  const box = (w, h, d, col, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(col)); m.position.set(x, y, z); g.add(m); return m; };
+  const green = [0.24, 0.55, 0.20];
+  box(0.5, 0.9, 0.3, green, 0, 0.85, 0);   // body
+  box(0.5, 0.5, 0.5, green, 0, 1.5, 0);    // head
+  box(0.2, 0.5, 0.2, green, -0.15, 0.25, 0.08); // legs
+  box(0.2, 0.5, 0.2, green, 0.15, 0.25, 0.08);
+  box(0.2, 0.5, 0.2, green, -0.15, 0.25, -0.08);
+  box(0.2, 0.5, 0.2, green, 0.15, 0.25, -0.08);
+  box(0.06, 0.18, 0.06, [0.5, 0.4, 0.2], 0, 1.85, 0); // fuse
+  g.scale.setScalar(SCALE);
+  return g;
+}
+function makeSheep() {
+  const g = new THREE.Group();
+  const mat = c => new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]) });
+  const box = (w, h, d, col, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(col)); m.position.set(x, y, z); g.add(m); return m; };
+  const wool = [0.92, 0.92, 0.95], dark = [0.25, 0.25, 0.28];
+  box(0.6, 0.5, 0.9, wool, 0, 0.7, 0);     // body
+  box(0.35, 0.35, 0.35, wool, 0, 0.95, 0.55); // head
+  box(0.12, 0.4, 0.12, dark, -0.18, 0.2, 0.3);
+  box(0.12, 0.4, 0.12, dark, 0.18, 0.2, 0.3);
+  box(0.12, 0.4, 0.12, dark, -0.18, 0.2, -0.3);
+  box(0.12, 0.4, 0.12, dark, 0.18, 0.2, -0.3);
+  g.scale.setScalar(SCALE);
+  return g;
+}
+const entities = [];
+function surfaceY(x, z) { for (let y = SY - 1; y > 0; y--) if (SOLID.has(getBlock(x, y, z))) return y + 1; return SY; }
+function addEntity(type, x, y, z) {
+  const model = type === 'creeper' ? makeCreeper() : makeSheep();
+  scene.add(model);
+  entities.push({ type, pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(),
+    model, alive: true, onGround: false, fuse: 0, w: 0.25, h: type === 'creeper' ? 1.7 : 1.1,
+    heading: Math.random() * Math.PI * 2, wanderT: 0, wanderAng: 0 });
+}
+function spawnEntities() {
+  for (let i = 0; i < 22; i++) { const x = 2 + Math.floor(Math.random() * (SX - 4)), z = 2 + Math.floor(Math.random() * (SZ - 4)); addEntity('sheep', x + 0.5, surfaceY(x, z), z + 0.5); }
+  for (let i = 0; i < 8; i++) { const x = 2 + Math.floor(Math.random() * (SX - 4)), z = 2 + Math.floor(Math.random() * (SZ - 4)); addEntity('creeper', x + 0.5, surfaceY(x, z), z + 0.5); }
+}
+function solidAt(x, y, z) { return SOLID.has(getBlock(Math.floor(x), Math.floor(y), Math.floor(z))); }
+function entityCollides(x, y, z, w, h) {
+  const minx = Math.floor(x - w), maxx = Math.floor(x + w);
+  const miny = Math.floor(y), maxy = Math.floor(y + h);
+  const minz = Math.floor(z - w), maxz = Math.floor(z + w);
+  for (let ix = minx; ix <= maxx; ix++)
+    for (let iy = miny; iy <= maxy; iy++)
+      for (let iz = minz; iz <= maxz; iz++)
+        if (SOLID.has(getBlock(ix, iy, iz))) return true;
+  return false;
+}
+function stepEntity(e, dt) {
+  e.vel.y += GRAVITY * dt;
+  const nx = e.pos.x + e.vel.x * dt;
+  if (!entityCollides(nx, e.pos.y, e.pos.z, e.w, e.h)) e.pos.x = nx; else e.vel.x = 0;
+  const nz = e.pos.z + e.vel.z * dt;
+  if (!entityCollides(e.pos.x, e.pos.y, nz, e.w, e.h)) e.pos.z = nz; else e.vel.z = 0;
+  const ny = e.pos.y + e.vel.y * dt;
+  if (e.vel.y <= 0) {
+    if (solidAt(e.pos.x, ny - 0.05, e.pos.z) || ny < 0) { e.pos.y = Math.floor(ny) + 1; e.vel.y = 0; e.onGround = true; }
+    else { e.pos.y = ny; e.onGround = false; }
+  } else {
+    if (solidAt(e.pos.x, ny + e.h, e.pos.z)) e.vel.y = 0; else e.pos.y = ny;
+    e.onGround = false;
+  }
+}
+function wander(e, dt, speed) {
+  e.wanderT -= dt;
+  if (e.wanderT <= 0) { e.wanderT = 1 + Math.random() * 2; e.wanderAng = Math.random() * Math.PI * 2; }
+  e.vel.x = Math.sin(e.wanderAng) * speed; e.vel.z = Math.cos(e.wanderAng) * speed;
+  e.heading = e.wanderAng;
+}
+function explode(e) {
+  const R = 3;
+  const cx = Math.floor(e.pos.x), cy = Math.floor(e.pos.y + 0.8), cz = Math.floor(e.pos.z);
+  const x0 = Math.max(0, cx - R), x1 = Math.min(SX - 1, cx + R);
+  const y0 = Math.max(1, cy - R), y1 = Math.min(SY - 1, cy + R);
+  const z0 = Math.max(0, cz - R), z1 = Math.min(SZ - 1, cz + R);
+  for (let x = x0; x <= x1; x++)
+    for (let y = y0; y <= y1; y++)
+      for (let z = z0; z <= z1; z++)
+        if (Math.hypot(x - cx, y - cy, z - cz) <= R + 0.5 && getBlock(x, y, z) !== AIR) setBlock(x, y, z, AIR);
+  rebuildRegion(x0, x1, z0, z1);
+  playExplosion();
+  flashScreen();
+  const d = e.pos.distanceTo(player.pos);
+  if (d < R + 2.5) damagePlayer(Math.round(45 * (1 - d / (R + 2.5))));
+  removeEntity(e);
+}
+function removeEntity(e) { e.alive = false; scene.remove(e.model); }
+function updateEntities(dt) {
+  for (const e of entities) {
+    if (!e.alive) continue;
+    if (e.type === 'creeper') {
+      const dx = player.pos.x - e.pos.x, dz = player.pos.z - e.pos.z;
+      const dist = Math.hypot(dx, dz);
+      if (e.fuse > 0) {
+        e.fuse -= dt;
+        e.model.scale.setScalar(SCALE * (1 + 0.18 * Math.abs(Math.sin(performance.now() * 0.02))));
+        if (e.fuse <= 0) { explode(e); continue; }
+      } else if (dist < 26) {
+        const s = 2.6;
+        e.vel.x = dx / dist * s; e.vel.z = dz / dist * s; e.heading = Math.atan2(dx, dz);
+        if (dist < 2.2) { e.fuse = 1.5; playHiss(); }
+      } else wander(e, dt, 1.2);
+    } else {
+      const dx = player.pos.x - e.pos.x, dz = player.pos.z - e.pos.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < 5) { const s = 2.4; e.vel.x = -dx / dist * s; e.vel.z = -dz / dist * s; e.heading = Math.atan2(-dx, -dz); }
+      else wander(e, dt, 1.0);
+    }
+    if (e.onGround && Math.random() < 0.02) e.vel.y = 6;
+    stepEntity(e, dt);
+    e.model.position.set(e.pos.x * SCALE, e.pos.y * SCALE, e.pos.z * SCALE);
+    e.model.rotation.y = e.heading;
+  }
+}
+function damagePlayer(amt) {
+  if (amt <= 0) return;
+  player.health -= amt;
+  flashScreen();
+  if (player.health <= 0) { player.pos.copy(spawnPos); player.vel.set(0, 0, 0); player.health = 100; }
+}
+spawnEntities();
+
 const keys = {};
 addEventListener('keydown', e => {
   keys[e.code] = true;
@@ -534,8 +707,8 @@ function move(dt) {
 
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
   const dir = new THREE.Vector3();
-  if (keys['KeyW']) dir.add(fwd);
-  if (keys['KeyS']) dir.sub(fwd);
+  if (keys['KeyW']) { dir.x += fx; dir.z += fz; }
+  if (keys['KeyS']) { dir.x -= fx; dir.z -= fz; }
   if (dir.lengthSq() > 0) dir.normalize();
   const spd = (keys['ShiftLeft'] || keys['ShiftRight']) ? SPRINT : SPEED;
   player.vel.x = dir.x * spd; player.vel.z = dir.z * spd;
@@ -642,9 +815,9 @@ const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
-  if (playing) { move(dt); updateTarget(); }
+  if (playing) { move(dt); updateTarget(); updateEntities(dt); }
   updateCharacter(dt);
-  hud.textContent = `XYZ: ${player.pos.x.toFixed(1)} / ${player.pos.y.toFixed(1)} / ${player.pos.z.toFixed(1)}  •  ${NAMES[BLOCKS[selected]]}`;
+  hud.textContent = `HP: ${Math.max(0, Math.round(player.health))}  •  XYZ: ${player.pos.x.toFixed(1)} / ${player.pos.y.toFixed(1)} / ${player.pos.z.toFixed(1)}  •  ${NAMES[BLOCKS[selected]]}`;
   renderer.render(scene, camera);
 }
 animate();
