@@ -297,7 +297,7 @@ function rebuildAt(x, y, z) {
 // Look + pointer lock (works even when pointer lock is unavailable, e.g. iframe)
 // ---------------------------------------------------------------------------
 let yaw = 0, pitch = 0;
-let locked = false, dragMode = false, playing = false;
+let locked = false, playing = false;
 let mouseDown = false, moved = 0;
 
 camera.rotation.order = 'YXZ';
@@ -311,21 +311,21 @@ function requestLock() {
 
 document.addEventListener('pointerlockchange', () => {
   locked = (document.pointerLockElement === renderer.domElement);
-  if (!locked && playing) dragMode = true; // lost lock or never had it -> drag to look
+  document.body.style.cursor = locked ? 'none' : 'default';
 });
-document.addEventListener('pointerlockerror', () => { locked = false; dragMode = true; });
+document.addEventListener('pointerlockerror', () => { locked = false; });
 
 const overlay = document.getElementById('overlay');
 overlay.addEventListener('click', () => {
   playing = true;
   overlay.style.display = 'none';
-  document.body.style.cursor = 'none';
-  try { requestLock(); } catch (e) { dragMode = true; }
+  try { requestLock(); } catch (e) { /* fall back to drag-to-look below */ }
 });
 
 addEventListener('mousemove', e => {
   if (!playing) return;
-  if (locked || (dragMode && mouseDown)) {
+  // Turn with the mouse either when pointer-locked, or by holding left button (drag-look fallback)
+  if (locked || mouseDown) {
     yaw -= e.movementX * 0.0022;
     pitch -= e.movementY * 0.0022;
     pitch = Math.max(-1.55, Math.min(1.55, pitch));
