@@ -92,6 +92,7 @@ const { THREE } = await loadThree();
 // ---------------------------------------------------------------------------
 const SX = 64, SY = 40, SZ = 64;
 const WATER_LEVEL = 12;
+const SCALE = 0.5; // world units per voxel (smaller = finer blocks)
 
 const AIR = 0, GRASS = 1, DIRT = 2, STONE = 3, SAND = 4, WOOD = 5, LEAVES = 6, GLASS = 7, WATER = 8;
 const SOLID = new Set([GRASS, DIRT, STONE, SAND, WOOD, LEAVES, GLASS]);
@@ -221,7 +222,7 @@ function buildGeometry() {
           const col = colorFor(id, f.dir);
           const base = arr.length / 3;
           for (let i = 0; i < 4; i++) {
-            arr.push(x + f.corners[i][0], y + f.corners[i][1], z + f.corners[i][2]);
+            arr.push((x + f.corners[i][0]) * SCALE, (y + f.corners[i][1]) * SCALE, (z + f.corners[i][2]) * SCALE);
             carr.push(col[0], col[1], col[2]);
           }
           iarr.push(base, base + 1, base + 2, base, base + 2, base + 3);
@@ -245,7 +246,7 @@ function buildGeometry() {
 // ---------------------------------------------------------------------------
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
-scene.fog = new THREE.Fog(0x87ceeb, 40, 90);
+scene.fog = new THREE.Fog(0x87ceeb, 40 * SCALE, 90 * SCALE);
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 200);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -258,7 +259,7 @@ let mesh = buildGeometry();
 scene.add(mesh.opaque, mesh.transparent);
 
 const highlight = new THREE.LineSegments(
-  new THREE.EdgesGeometry(new THREE.BoxGeometry(1.001, 1.001, 1.001)),
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(SCALE * 1.002, SCALE * 1.002, SCALE * 1.002)),
   new THREE.LineBasicMaterial({ color: 0x000000 })
 );
 highlight.visible = false;
@@ -320,7 +321,7 @@ const player = { pos: new THREE.Vector3(SX / 2, SY, SZ / 2), vel: new THREE.Vect
 for (let y = SY - 1; y > 0; y--) {
   if (SOLID.has(getBlock(Math.floor(player.pos.x), y, Math.floor(player.pos.z)))) { player.pos.y = y + 1; break; }
 }
-camera.position.copy(player.pos);
+camera.position.set(player.pos.x * SCALE, player.pos.y * SCALE, player.pos.z * SCALE);
 
 const keys = {};
 addEventListener('keydown', e => { keys[e.code] = true; if (e.key >= '1' && e.key <= '7') selectSlot(+e.key - 1); });
@@ -368,7 +369,7 @@ function move(dt) {
   step('x', player.vel.x * dt);
   step('z', player.vel.z * dt);
   step('y', player.vel.y * dt);
-  camera.position.copy(p);
+  camera.position.set(p.x * SCALE, p.y * SCALE, p.z * SCALE);
 }
 
 // ---------------------------------------------------------------------------
@@ -384,16 +385,17 @@ function updateTarget() {
   if (hits.length && hits[0].distance < 8) {
     const h = hits[0];
     const n = h.face.normal;
+    const px = h.point.x / SCALE, py = h.point.y / SCALE, pz = h.point.z / SCALE;
     const place = new THREE.Vector3(
-      Math.floor(h.point.x + n.x * 0.5),
-      Math.floor(h.point.y + n.y * 0.5),
-      Math.floor(h.point.z + n.z * 0.5));
+      Math.floor(px + n.x * 0.5),
+      Math.floor(py + n.y * 0.5),
+      Math.floor(pz + n.z * 0.5));
     const breakB = new THREE.Vector3(
-      Math.floor(h.point.x - n.x * 0.5),
-      Math.floor(h.point.y - n.y * 0.5),
-      Math.floor(h.point.z - n.z * 0.5));
+      Math.floor(px - n.x * 0.5),
+      Math.floor(py - n.y * 0.5),
+      Math.floor(pz - n.z * 0.5));
     target = { place, breakB };
-    highlight.position.copy(breakB).addScalar(0.5);
+    highlight.position.set((breakB.x + 0.5) * SCALE, (breakB.y + 0.5) * SCALE, (breakB.z + 0.5) * SCALE);
     highlight.visible = true;
   } else { target = null; highlight.visible = false; }
 }
