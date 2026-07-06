@@ -92,7 +92,8 @@ const { THREE } = await loadThree();
 // ---------------------------------------------------------------------------
 const SX = 64, SY = 40, SZ = 64;
 const WATER_LEVEL = 12;
-const SCALE = 0.5; // world units per voxel (smaller = finer blocks)
+const SCALE = 0.25; // world units per voxel (smaller = finer blocks)
+const EYE = 1.6;    // camera height above feet, in voxel units
 
 const AIR = 0, GRASS = 1, DIRT = 2, STONE = 3, SAND = 4, WOOD = 5, LEAVES = 6, GLASS = 7, WATER = 8;
 const SOLID = new Set([GRASS, DIRT, STONE, SAND, WOOD, LEAVES, GLASS]);
@@ -321,7 +322,7 @@ const player = { pos: new THREE.Vector3(SX / 2, SY, SZ / 2), vel: new THREE.Vect
 for (let y = SY - 1; y > 0; y--) {
   if (SOLID.has(getBlock(Math.floor(player.pos.x), y, Math.floor(player.pos.z)))) { player.pos.y = y + 1; break; }
 }
-camera.position.set(player.pos.x * SCALE, player.pos.y * SCALE, player.pos.z * SCALE);
+camera.position.set(player.pos.x * SCALE, (player.pos.y + EYE) * SCALE, player.pos.z * SCALE);
 
 const keys = {};
 addEventListener('keydown', e => { keys[e.code] = true; if (e.key >= '1' && e.key <= '7') selectSlot(+e.key - 1); });
@@ -369,7 +370,7 @@ function move(dt) {
   step('x', player.vel.x * dt);
   step('z', player.vel.z * dt);
   step('y', player.vel.y * dt);
-  camera.position.set(p.x * SCALE, p.y * SCALE, p.z * SCALE);
+  camera.position.set(p.x * SCALE, (p.y + EYE) * SCALE, p.z * SCALE);
 }
 
 // ---------------------------------------------------------------------------
