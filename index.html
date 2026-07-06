@@ -205,39 +205,39 @@ const FACES = [
 ];
 
 function buildGeometry() {
-  const op = [], oc = [], tr = [], tc = [];
+  const op = [], oc = [], oi = [];
+  const tr = [], tc = [], ti = [];
   for (let z = 0; z < SZ; z++)
     for (let y = 0; y < SY; y++)
       for (let x = 0; x < SX; x++) {
         const id = getBlock(x, y, z);
         if (id === AIR) continue;
         const transparent = (id === WATER || id === GLASS);
+        const arr = transparent ? tr : op, carr = transparent ? tc : oc, iarr = transparent ? ti : oi;
         for (const f of FACES) {
           const nb = getBlock(x + f.dir[0], y + f.dir[1], z + f.dir[2]);
           const visible = transparent ? (nb === AIR) : !OPAQUE.has(nb);
           if (!visible) continue;
           const col = colorFor(id, f.dir);
-          const arr = transparent ? tr : op, carr = transparent ? tc : oc;
+          const base = arr.length / 3;
           for (let i = 0; i < 4; i++) {
             arr.push(x + f.corners[i][0], y + f.corners[i][1], z + f.corners[i][2]);
             carr.push(col[0], col[1], col[2]);
           }
-          const n = arr.length / 3;
-          const a = n - 4, b = n - 3, c = n - 2, d = n - 1;
-          arr.push(arr[a*3],arr[a*3+1],arr[a*3+2], arr[b*3],arr[b*3+1],arr[b*3+2], arr[c*3],arr[c*3+1],arr[c*3+2]);
-          arr.push(arr[a*3],arr[a*3+1],arr[a*3+2], arr[c*3],arr[c*3+1],arr[c*3+2], arr[d*3],arr[d*3+1],arr[d*3+2]);
+          iarr.push(base, base + 1, base + 2, base, base + 2, base + 3);
         }
       }
 
-  const mk = (positions, colors, transparent) => {
+  const mk = (positions, colors, index, transparent) => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    g.setIndex(index);
     const m = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide,
       transparent: transparent, opacity: transparent ? 0.6 : 1.0 });
     return new THREE.Mesh(g, m);
   };
-  return { opaque: mk(op, oc, false), transparent: mk(tr, tc, true) };
+  return { opaque: mk(op, oc, oi, false), transparent: mk(tr, tc, ti, true) };
 }
 
 // ---------------------------------------------------------------------------
