@@ -376,6 +376,14 @@ let yaw = 0, pitch = 0;
 let locked = false, playing = false;
 let mouseDown = false, moved = 0;
 
+const crosshairEl = document.getElementById('crosshair');
+let mouseNDC = new THREE.Vector2(0, 0);
+let mouseX = innerWidth / 2, mouseY = innerHeight / 2;
+function positionCrosshair() {
+  if (locked) { crosshairEl.style.left = '50%'; crosshairEl.style.top = '50%'; }
+  else { crosshairEl.style.left = mouseX + 'px'; crosshairEl.style.top = mouseY + 'px'; }
+}
+
 camera.rotation.order = 'YXZ';
 function setLook() { camera.rotation.set(pitch, yaw, 0); }
 
@@ -388,20 +396,34 @@ function requestLock() {
 document.addEventListener('pointerlockchange', () => {
   locked = (document.pointerLockElement === renderer.domElement);
   document.body.style.cursor = locked ? 'none' : 'default';
+  positionCrosshair();
 });
 document.addEventListener('pointerlockerror', () => { locked = false; });
 
 const overlay = document.getElementById('overlay');
+function showMenu() {
+  playing = false;
+  highlight.visible = false;
+  overlay.style.display = 'flex';
+  positionCrosshair();
+}
 overlay.addEventListener('click', () => {
   playing = true;
   overlay.style.display = 'none';
   initAudio();
   if (musicOn) startMusic();
+  positionCrosshair();
   try { requestLock(); } catch (e) { /* fall back to drag-to-look below */ }
 });
 
 addEventListener('mousemove', e => {
   if (!playing) return;
+  if (!locked) {
+    mouseX = e.clientX; mouseY = e.clientY;
+    mouseNDC.x = (e.clientX / innerWidth) * 2 - 1;
+    mouseNDC.y = -(e.clientY / innerHeight) * 2 + 1;
+    positionCrosshair();
+  }
   // Turn with the mouse either when pointer-locked, or by holding left button (drag-look fallback)
   if (locked || mouseDown) {
     yaw -= e.movementX * 0.0022;
@@ -423,7 +445,11 @@ for (let y = SY - 1; y > 0; y--) {
 camera.position.set(player.pos.x * SCALE, (player.pos.y + EYE) * SCALE, player.pos.z * SCALE);
 
 const keys = {};
-addEventListener('keydown', e => { keys[e.code] = true; if (e.key >= '1' && e.key <= '7') selectSlot(+e.key - 1); });
+addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'Escape') showMenu();
+  if (e.key >= '1' && e.key <= '7') selectSlot(+e.key - 1);
+});
 addEventListener('keyup', e => { keys[e.code] = false; });
 
 const GRAVITY = -28, JUMP = 9, SPEED = 5, SPRINT = 8;
@@ -482,7 +508,7 @@ const center = new THREE.Vector2(0, 0);
 let target = null;
 
 function updateTarget() {
-  raycaster.setFromCamera(center, camera);
+  raycaster.setFromCamera(locked ? center : mouseNDC, camera);
   const hits = raycaster.intersectObjects(allMeshes, false);
   if (hits.length && hits[0].distance < 8) {
     const h = hits[0];
