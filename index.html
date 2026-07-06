@@ -90,9 +90,10 @@ const { THREE } = await loadThree();
 // ---------------------------------------------------------------------------
 // World configuration
 // ---------------------------------------------------------------------------
-const SX = 64, SY = 40, SZ = 64;
-const WATER_LEVEL = 12;
-const SCALE = 0.25; // world units per voxel (smaller = finer blocks)
+const SX = 256, SY = 64, SZ = 256; // world size in voxels (larger world)
+const CHUNK = 16;                   // chunk columns (x and z)
+const WATER_LEVEL = 22;
+const SCALE = 1 / 16; // world units per voxel (smaller = finer blocks)
 const EYE = 1.6;    // camera height above feet, in voxel units
 
 const AIR = 0, GRASS = 1, DIRT = 2, STONE = 3, SAND = 4, WOOD = 5, LEAVES = 6, GLASS = 7, WATER = 8;
@@ -151,7 +152,7 @@ function generate() {
   world.fill(AIR);
   for (let x = 0; x < SX; x++) {
     for (let z = 0; z < SZ; z++) {
-      const h = Math.floor(SY / 2 - 4 + fractal(x, z) * 10);
+      const h = Math.floor(SY / 2 - 4 + fractal(x, z) * 14);
       for (let y = 0; y <= h; y++) {
         let b;
         if (y === h) b = h <= WATER_LEVEL + 1 ? SAND : GRASS;
@@ -206,12 +207,13 @@ const FACES = [
   { dir: [ 0, 0,-1], corners: [[0,0,0],[0,1,0],[1,1,0],[1,0,0]] },
 ];
 
-function buildGeometry() {
+function buildChunk(cx, cz) {
   const op = [], oc = [], oi = [];
   const tr = [], tc = [], ti = [];
-  for (let z = 0; z < SZ; z++)
+  const x0 = cx * CHUNK, z0 = cz * CHUNK;
+  for (let z = z0; z < z0 + CHUNK; z++)
     for (let y = 0; y < SY; y++)
-      for (let x = 0; x < SX; x++) {
+      for (let x = x0; x < x0 + CHUNK; x++) {
         const id = getBlock(x, y, z);
         if (id === AIR) continue;
         const transparent = (id === WATER || id === GLASS);
@@ -247,17 +249,27 @@ function buildGeometry() {
 // ---------------------------------------------------------------------------
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
-scene.fog = new THREE.Fog(0x87ceeb, 40 * SCALE, 90 * SCALE);
+scene.fog = new THREE.Fog(0x87ceeb, 80 * SCALE, 240 * SCALE);
 
-const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 200);
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 500);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 document.getElementById('app').appendChild(renderer.domElement);
 
 generate();
-let mesh = buildGeometry();
-scene.add(mesh.opaque, mesh.transparent);
+
+const CHUNKS_X = Math.ceil(SX / CHUNK), CHUNKS_Z = Math.ceil(SZ / CHUNK);
+const chunks = new Map();
+let allMeshes = [];
+function refreshMeshes() { allMeshes = []; chunks.forEach(c => allMeshes.push(c.opaque, c.transparent)); }
+for (let cx = 0; cx < CHUNKS_X; cx++)
+  for (let cz = 0; cz < CHUNKS_Z; cz++) {
+    const c = buildChunk(cx, cz);
+    chunks.set(cx + ',' + cz, c);
+    scene.add(c.opaque, c.transparent);
+  }
+refreshMeshes();
 
 const highlight = new THREE.LineSegments(
   new THREE.EdgesGeometry(new THREE.BoxGeometry(SCALE * 1.002, SCALE * 1.002, SCALE * 1.002)),
@@ -266,11 +278,19 @@ const highlight = new THREE.LineSegments(
 highlight.visible = false;
 scene.add(highlight);
 
-function rebuild() {
-  scene.remove(mesh.opaque, mesh.transparent);
-  mesh.opaque.geometry.dispose(); mesh.transparent.geometry.dispose();
-  mesh = buildGeometry();
-  scene.add(mesh.opaque, mesh.transparent);
+function rebuildAt(x, y, z) {
+  const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK);
+  for (const [dx, dz] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const nx = cx + dx, nz = cz + dz;
+    if (nx < 0 || nz < 0 || nx >= CHUNKS_X || nz >= CHUNKS_Z) continue;
+    const key = nx + ',' + nz;
+    const old = chunks.get(key);
+    if (old) { scene.remove(old.opaque, old.transparent); old.opaque.geometry.dispose(); old.transparent.geometry.dispose(); }
+    const c = buildChunk(nx, nz);
+    chunks.set(key, c);
+    scene.add(c.opaque, c.transparent);
+  }
+  refreshMeshes();
 }
 
 // ---------------------------------------------------------------------------
@@ -382,7 +402,7 @@ let target = null;
 
 function updateTarget() {
   raycaster.setFromCamera(center, camera);
-  const hits = raycaster.intersectObjects([mesh.opaque, mesh.transparent], false);
+  const hits = raycaster.intersectObjects(allMeshes, false);
   if (hits.length && hits[0].distance < 8) {
     const h = hits[0];
     const n = h.face.normal;
@@ -426,11 +446,11 @@ function inPlayer(x, y, z) {
 
 function breakBlock() {
   const { x, y, z } = target.breakB;
-  if (getBlock(x, y, z) !== AIR) { setBlock(x, y, z, AIR); rebuild(); }
+  if (getBlock(x, y, z) !== AIR) { setBlock(x, y, z, AIR); rebuildAt(x, y, z); }
 }
 function placeBlock() {
   const { x, y, z } = target.place;
-  if (getBlock(x, y, z) === AIR && !inPlayer(x, y, z)) { setBlock(x, y, z, BLOCKS[selected]); rebuild(); }
+    if (getBlock(x, y, z) === AIR && !inPlayer(x, y, z)) { setBlock(x, y, z, BLOCKS[selected]); rebuildAt(x, y, z); }
 }
 
 renderer.domElement.addEventListener('mousedown', e => {
