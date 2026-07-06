@@ -57,10 +57,11 @@
 <div id="overlay">
   <h1>VoxelCraft</h1>
   <p><b>Click to play</b></p>
-  <p><span class="key">W A S D</span> move &nbsp; <span class="key">Space</span> jump &nbsp; <span class="key">Shift</span> sprint</p>
+  <p><span class="key">W S</span> move &nbsp; <span class="key">A D</span> turn &nbsp; <span class="key">Space</span> jump &nbsp; <span class="key">Shift</span> sprint</p>
   <p><span class="key">Mouse</span> look &nbsp; <span class="key">L-Click</span> break &nbsp; <span class="key">R-Click</span> place</p>
   <p><span class="key">1-7</span> select block &nbsp; <span class="key">Esc</span> release mouse</p>
   <p style="font-size:12px;opacity:0.7">If the mouse won't capture (e.g. inside an iframe): hold <b>Left-Mouse</b> and drag to look.</p>
+  <p class="play" id="musicToggle">🔊 Music: ON</p>
   <p class="play">▶ Play</p>
   <p class="err" id="err"></p>
 </div>
@@ -295,6 +296,80 @@ function rebuildAt(x, y, z) {
 }
 
 // ---------------------------------------------------------------------------
+// Audio (Web Audio API — no external files needed)
+// ---------------------------------------------------------------------------
+let audioCtx = null, musicGain = null, sfxGain = null;
+let musicOn = true, musicRunning = false, musicTimer = null, musicStep = 0;
+
+function initAudio() {
+  if (audioCtx) { audioCtx.resume && audioCtx.resume(); return; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  audioCtx = new AC();
+  musicGain = audioCtx.createGain(); musicGain.gain.value = 0.22; musicGain.connect(audioCtx.destination);
+  sfxGain = audioCtx.createGain(); sfxGain.gain.value = 0.5; sfxGain.connect(audioCtx.destination);
+}
+const PENTA = [0, 2, 4, 7, 9]; // major pentatonic
+function playTone(freq, time, dur, gainNode) {
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = 'triangle'; o.frequency.value = freq;
+  o.connect(g); g.connect(gainNode);
+  g.gain.setValueAtTime(0.0001, time);
+  g.gain.linearRampToValueAtTime(0.9, time + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+  o.start(time); o.stop(time + dur + 0.05);
+}
+function musicTick() {
+  if (!musicOn || !audioCtx) { musicRunning = false; return; }
+  const t = audioCtx.currentTime + 0.06;
+  const beat = musicStep % 8;
+  const deg = PENTA[(musicStep * 3) % PENTA.length];
+  const oct = (beat % 2 === 0) ? 1 : 0.5;
+  playTone(220 * Math.pow(2, deg / 12) * oct, t, 0.42, musicGain);
+  if (beat % 4 === 0) playTone(110, t, 0.9, musicGain); // soft bass
+  musicStep++;
+  musicTimer = setTimeout(musicTick, 300);
+}
+function startMusic() { if (musicRunning) return; musicRunning = true; musicTick(); }
+function stopMusic() { musicRunning = false; if (musicTimer) clearTimeout(musicTimer); }
+
+function playMine() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const n = Math.floor(audioCtx.sampleRate * 0.15);
+  const buf = audioCtx.createBuffer(1, n, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2);
+  const src = audioCtx.createBufferSource(); src.buffer = buf;
+  const bp = audioCtx.createBiquadFilter(); bp.type = 'lowpass'; bp.frequency.value = 1400;
+  const g = audioCtx.createGain(); g.gain.value = 0.7;
+  src.connect(bp); bp.connect(g); g.connect(sfxGain);
+  src.start(t); src.stop(t + 0.15);
+  const o = audioCtx.createOscillator(); o.type = 'sine';
+  o.frequency.setValueAtTime(190, t); o.frequency.exponentialRampToValueAtTime(60, t + 0.12);
+  const og = audioCtx.createGain(); og.gain.setValueAtTime(0.5, t); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+  o.connect(og); og.connect(sfxGain); o.start(t); o.stop(t + 0.16);
+}
+function playPlace() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const o = audioCtx.createOscillator(); o.type = 'square';
+  o.frequency.setValueAtTime(420, t); o.frequency.exponentialRampToValueAtTime(180, t + 0.07);
+  const g = audioCtx.createGain(); g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+  o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + 0.1);
+}
+
+const musicToggleEl = document.getElementById('musicToggle');
+function updateMusicLabel() { musicToggleEl.textContent = (musicOn ? '🔊' : '🔇') + ' Music: ' + (musicOn ? 'ON' : 'OFF'); }
+musicToggleEl.addEventListener('click', e => {
+  e.stopPropagation();
+  initAudio();
+  musicOn = !musicOn;
+  updateMusicLabel();
+  if (musicOn) startMusic(); else stopMusic();
+});
+
+// ---------------------------------------------------------------------------
 // Look + pointer lock (works even when pointer lock is unavailable, e.g. iframe)
 // ---------------------------------------------------------------------------
 let yaw = 0, pitch = 0;
@@ -320,6 +395,8 @@ const overlay = document.getElementById('overlay');
 overlay.addEventListener('click', () => {
   playing = true;
   overlay.style.display = 'none';
+  initAudio();
+  if (musicOn) startMusic();
   try { requestLock(); } catch (e) { /* fall back to drag-to-look below */ }
 });
 
@@ -368,13 +445,16 @@ function collides() {
 }
 
 function move(dt) {
+  // A / D turn the view; W / S move forward / back
+  const TURN = 2.4; // radians per second
+  if (keys['KeyA']) yaw += TURN * dt;
+  if (keys['KeyD']) yaw -= TURN * dt;
+  setLook();
+
   const fwd = new THREE.Vector3(); camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
-  const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
   const dir = new THREE.Vector3();
   if (keys['KeyW']) dir.add(fwd);
   if (keys['KeyS']) dir.sub(fwd);
-  if (keys['KeyD']) dir.add(right);
-  if (keys['KeyA']) dir.sub(right);
   if (dir.lengthSq() > 0) dir.normalize();
   const spd = (keys['ShiftLeft'] || keys['ShiftRight']) ? SPRINT : SPEED;
   player.vel.x = dir.x * spd; player.vel.z = dir.z * spd;
@@ -448,11 +528,11 @@ function inPlayer(x, y, z) {
 
 function breakBlock() {
   const { x, y, z } = target.breakB;
-  if (getBlock(x, y, z) !== AIR) { setBlock(x, y, z, AIR); rebuildAt(x, y, z); }
+  if (getBlock(x, y, z) !== AIR) { setBlock(x, y, z, AIR); rebuildAt(x, y, z); playMine(); }
 }
 function placeBlock() {
   const { x, y, z } = target.place;
-    if (getBlock(x, y, z) === AIR && !inPlayer(x, y, z)) { setBlock(x, y, z, BLOCKS[selected]); rebuildAt(x, y, z); }
+    if (getBlock(x, y, z) === AIR && !inPlayer(x, y, z)) { setBlock(x, y, z, BLOCKS[selected]); rebuildAt(x, y, z); playPlace(); }
 }
 
 renderer.domElement.addEventListener('mousedown', e => {
