@@ -700,6 +700,10 @@ addEventListener('keydown', e => {
   keys[e.code] = true;
   if (e.code === 'Escape') showMenu();
   if (e.key >= '1' && e.key <= '7') selectSlot(+e.key - 1);
+  if (playing) {
+    if (e.code === 'KeyE' && target) breakBlock();
+    if (e.code === 'KeyF' && target) placeBlock();
+  }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 
@@ -814,7 +818,8 @@ function placeBlock() {
 }
 
 let downTime = 0;
-renderer.domElement.addEventListener('mousedown', e => {
+addEventListener('mousedown', e => {
+  if (e.target !== renderer.domElement) return; // ignore clicks on HUD/hotbar/overlay
   if (!playing || !target) return;
   if (e.button === 0) { mouseDown = true; moved = 0; downTime = performance.now(); }
   else if (e.button === 2) { placeBlock(); }
