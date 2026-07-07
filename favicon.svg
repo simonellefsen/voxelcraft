@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="6" fill="#87ceeb"/>
+  <g transform="translate(16 16)">
+    <!-- top face (grass) -->
+    <polygon points="0,-9 9,-4 0,1 -9,-4" fill="#5cb84d"/>
+    <!-- left face (dirt) -->
+    <polygon points="-9,-4 0,1 0,10 -9,5" fill="#7a5a36"/>
+    <!-- right face (dirt) -->
+    <polygon points="9,-4 0,1 0,10 9,5" fill="#5e4427"/>
+    <!-- grass overhang on top edges -->
+    <polygon points="0,-9 9,-4 0,1 -9,-4" fill="#5cb84d" opacity="0.0"/>
+  </g>
+</svg>
