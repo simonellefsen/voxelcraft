@@ -809,12 +809,20 @@ function inPlayer(x, y, z) {
 }
 
 function breakBlock() {
-  const { x, y, z } = target.breakB;
-  if (getBlock(x, y, z) !== AIR) { setBlock(x, y, z, AIR); rebuildAt(x, y, z); playMine(); triggerSwing(); }
+  try {
+    updateTarget();
+    if (!target) { showError('break: no target'); return; }
+    const { x, y, z } = target.breakB;
+    if (getBlock(x, y, z) !== AIR) { setBlock(x, y, z, AIR); rebuildAt(x, y, z); playMine(); triggerSwing(); }
+  } catch (err) { showError('break error: ' + (err && err.message)); console.error(err); }
 }
 function placeBlock() {
-  const { x, y, z } = target.place;
+  try {
+    updateTarget();
+    if (!target) { showError('place: no target'); return; }
+    const { x, y, z } = target.place;
     if (getBlock(x, y, z) === AIR && !inPlayer(x, y, z)) { setBlock(x, y, z, BLOCKS[selected]); rebuildAt(x, y, z); playPlace(); }
+  } catch (err) { showError('place error: ' + (err && err.message)); console.error(err); }
 }
 
 let downTime = 0;
