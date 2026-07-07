@@ -772,11 +772,11 @@ function updateTarget() {
     const h = hits[0];
     const d = raycaster.ray.direction; // points away from eye, into the scene
     const px = h.point.x / SCALE, py = h.point.y / SCALE, pz = h.point.z / SCALE;
-    // solid block is on the side the ray came from; empty cell is in front
+    // solid block is on the +ray-direction side of the face; empty cell is in front (-dir)
     const breakB = new THREE.Vector3(
-      Math.floor(px - d.x * 0.5), Math.floor(py - d.y * 0.5), Math.floor(pz - d.z * 0.5));
-    const place = new THREE.Vector3(
       Math.floor(px + d.x * 0.5), Math.floor(py + d.y * 0.5), Math.floor(pz + d.z * 0.5));
+    const place = new THREE.Vector3(
+      Math.floor(px - d.x * 0.5), Math.floor(py - d.y * 0.5), Math.floor(pz - d.z * 0.5));
     target = { place, breakB };
     highlight.position.set((breakB.x + 0.5) * SCALE, (breakB.y + 0.5) * SCALE, (breakB.z + 0.5) * SCALE);
     highlight.visible = true;
