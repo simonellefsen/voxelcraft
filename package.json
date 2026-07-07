@@ -1,0 +1,11 @@
+{
+  "name": "voxelcraft",
+  "version": "0.1.0",
+  "description": "Browser-based Minecraft-style voxel sandbox game (modular ES modules, no build step).",
+  "type": "module",
+  "scripts": {
+    "serve": "python3 -m http.server 8000",
+    "check": "for f in $(find src -name '*.js'); do node --check \"$f\" || exit 1; done"
+  },
+  "private": true
+}
