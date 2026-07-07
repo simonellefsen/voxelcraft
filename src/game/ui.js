@@ -1,12 +1,16 @@
 // game/ui.js
-// Menu overlay, error reporting, HUD, music toggle, and the textual
-// diagnostics overlay (the LLM's "eyes" — see DESIGN.md).
+// Menu overlay, error reporting, HUD, music toggle, crafting menu, and the
+// textual diagnostics overlay (the LLM's "eyes" — see DESIGN.md).
 
 import { input, requestLock, positionCrosshair } from '../engine/input.js';
+import { commands } from '../engine/input/commands.js';
 import { highlight } from '../engine/renderer.js';
 import {
   initAudio, startMusic, stopMusic, isMusicOn, toggleMusic,
 } from '../engine/audio.js';
+import { inventory } from './inventory/playerInventory.js';
+import { ITEMS } from '../world/items/items.js';
+import { RECIPES, canCraft, craft, recipeSummary } from '../world/items/recipes.js';
 
 const overlay = document.getElementById('overlay');
 const errEl = document.getElementById('err');
@@ -58,6 +62,13 @@ export function initUI() {
   });
   updateMusicLabel();
 
+  // Crafting menu: I toggles, Esc closes (when open). These are handled here
+  // so the in-game pause (overlay) and the crafting sub-menu don't conflict.
+  addEventListener('keydown', e => {
+    if (craftOpen && e.code === 'Escape') { e.preventDefault(); hideCraftMenu(); return; }
+    if (e.code === 'KeyI' && input.playing && !craftOpen) { e.preventDefault(); commands.openInventory = true; }
+  });
+
   // Diagnostics overlay (textual vision for non-vision tooling)
   debugEl = document.createElement('div');
   debugEl.id = 'debug';
@@ -82,3 +93,72 @@ export function updateDiagnostics(d) {
     `Chunks: ${d.chunks}\n` +
     `Target: ${d.target || 'none'}`;
 }
+
+// ---- Crafting menu (Milestone 4) ----
+let craftEl = null;
+let craftOpen = false;
+
+/** Builds the (hidden) crafting overlay once. */
+function buildCraftUI() {
+  if (craftEl) return;
+  craftEl = document.createElement('div');
+  craftEl.id = 'craftOverlay';
+  craftEl.style.cssText =
+    'position:fixed;inset:0;z-index:25;display:none;align-items:center;' +
+    'justify-content:center;background:rgba(0,0,0,0.6);color:#fff;' +
+    'font-family:system-ui,sans-serif;';
+  document.body.appendChild(craftEl);
+}
+
+/** Re-renders the recipe list, reflecting current inventory availability. */
+function renderCraft() {
+  if (!craftEl) return;
+  const rows = RECIPES.map(r => {
+    const ok = canCraft(inventory, r);
+    const out = ITEMS[r.out.id] ? ITEMS[r.out.id].name : r.out.id;
+    return `<div class="crow ${ok ? '' : 'disabled'}" data-id="${r.id}">` +
+      `<div class="cname">${r.name}</div>` +
+      `<div class="cmeta">${recipeSummary(r)} → ${out} ×${r.out.count}</div>` +
+      `</div>`;
+  }).join('');
+  craftEl.innerHTML =
+    `<div class="cpanel"><h2>Crafting</h2>` +
+    `<div class="clist">${rows}</div>` +
+    `<div class="chint">Click a recipe to craft • <b>Esc</b>/<b>I</b> to close</div></div>`;
+  craftEl.querySelectorAll('.crow').forEach(row => {
+    if (row.classList.contains('disabled')) return;
+    row.addEventListener('click', () => {
+      const r = RECIPES.find(x => x.id === row.dataset.id);
+      if (r && craft(inventory, r)) renderCraft();
+    });
+  });
+}
+
+/** Opens the crafting menu (pauses the game). */
+export function showCraftMenu() {
+  if (!input.playing) return; // only from active play
+  buildCraftUI();
+  craftOpen = true;
+  input.playing = false;
+  if (highlight.current) highlight.current.visible = false;
+  renderCraft();
+  craftEl.style.display = 'flex';
+}
+
+/** Closes the crafting menu and resumes play. */
+export function hideCraftMenu() {
+  if (!craftOpen) return;
+  craftOpen = false;
+  if (craftEl) craftEl.style.display = 'none';
+  input.playing = true;
+  positionCrosshair();
+  try { requestLock(); } catch (e) { /* drag-to-look fallback */ }
+}
+
+/** Toggles the crafting menu. */
+export function toggleCraft() {
+  if (craftOpen) hideCraftMenu(); else showCraftMenu();
+}
+
+/** True while the crafting menu is open. */
+export function isCraftOpen() { return craftOpen; }

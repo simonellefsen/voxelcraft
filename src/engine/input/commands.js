@@ -40,13 +40,14 @@ export function consumeLook() {
   return [dx, dy];
 }
 
-/** Reads and clears the edge-triggered actions. */
+/** Reads and clears the edge-triggered actions. `break` is a held state
+ * (see updateMining) and is intentionally NOT cleared here. */
 export function consumeActions() {
   const a = {
-    break: commands.break, place: commands.place,
+    place: commands.place,
     interact: commands.interact, openInventory: commands.openInventory,
   };
-  commands.break = commands.place = commands.interact = commands.openInventory = false;
+  commands.place = commands.interact = commands.openInventory = false;
   return a;
 }
 

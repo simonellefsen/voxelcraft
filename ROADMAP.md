@@ -49,30 +49,27 @@ Per DESIGN.md "MOBILE": treat mobile as a first-class platform; structure input 
 unified command layer so desktop/touch/gamepad share gameplay logic.
 
 ### Input layer (unified Player Commands)
-- [ ] `engine/input/` split into low-level sources (keyboard/mouse, touch) + a
-      `commands` module emitting high-level: Move, Look, Jump, Break, Place,
-      Interact, OpenInventory, SelectSlot.
-- [ ] Touch controls: left-thumb virtual joystick (Move), right-thumb swipe (Look).
-- [ ] Context buttons: Jump, Sneak, Sprint, Interact, Inventory.
-- [ ] Tap block = select/break; tap adjacent face = place selected block.
-- [ ] Hotbar tap-to-select; long-press for extra options.
+- [x] `engine/input/commands.js` — unified state (Move/Look/Jump/Break/Place/Interact/SelectSlot).
+- [x] Keyboard/mouse source writes commands; `engine/input.js` refactored.
+- [x] `engine/input/touch.js` — virtual joystick, swipe-look, context buttons.
+- [ ] Gamepad source (future).
 
 ### Mobile UI
-- [ ] Detect touch / small screens; enlarge buttons + touch targets.
-- [ ] Simplified inventory grid; drag-and-drop item movement.
-- [ ] Crafting recipes selectable by tap (keep manual mode optional).
+- [x] Detect touch / small screens; enlarge buttons + touch targets.
+- [x] Simplified inventory grid; drag-and-drop item movement.
+- [x] Crafting recipes selectable by tap (keep manual mode optional).
 
 ### Performance for mobile
-- [ ] Auto-reduce render distance on touch devices (4–8 chunks).
-- [ ] Pause / throttle updates for distant entities.
+- [x] Auto-reduce render distance on touch devices (4–8 chunks).
+- [x] Pause / throttle updates for distant entities.
 - [ ] Generate terrain in a Web Worker (background, non-blocking).
 - [ ] Aggressive draw-call batching (already share atlas materials; verify counts).
 
-## Milestone 4 — Gameplay depth (PLANNED)
-- [ ] Data-driven items/tools; inventory module (hotbar backed by inventory).
-- [ ] Crafting recipes (JSON) + crafting table UI.
-- [ ] Tool mining speed + durability; block hardness.
-- [ ] Item drops + pickup entities.
+## Milestone 4 — Gameplay depth (shipped)
+- [x] Data-driven items/tools; inventory module (hotbar backed by inventory).
+- [x] Crafting recipes (data-driven) + crafting menu UI (toggle with `I`).
+- [x] Tool mining speed + durability; block hardness.
+- [x] Item drops + pickup entities.
 
 ## Milestone 5 — Entities & AI (PLANNED)
 - [ ] `Entity`/`LivingEntity` base classes; mob hierarchy.

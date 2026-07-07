@@ -13,6 +13,7 @@ import { initTouch, isTouch } from './engine/input/touch.js';
 import { TimeOfDay } from './engine/time.js';
 import { initPlayer, player, move, updateCharacter } from './game/player.js';
 import { spawnEntities, updateEntities } from './game/entities.js';
+import { updateDrops } from './game/entities/drops.js';
 import {
   initInteraction, tickInteractions, getSelectedName, getTargetLabel,
 } from './game/interaction.js';
@@ -70,6 +71,7 @@ function startLoop(time) {
       move(dt);
       tickInteractions();
       updateEntities(dt);
+      updateDrops(dt);
     }
     updateCharacter(dt);
 

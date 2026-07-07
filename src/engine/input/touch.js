@@ -100,6 +100,7 @@ function buildLookLayer() {
     const t = e.changedTouches[0];
     id = t.identifier; lastX = t.clientX; lastY = t.clientY;
     start = performance.now(); move = 0;
+    commands.break = true; // hold to mine
   }, { passive: false });
   layer.addEventListener('touchmove', e => {
     const t = [...e.changedTouches].find(c => c.identifier === id);
@@ -111,8 +112,7 @@ function buildLookLayer() {
     move += Math.abs(dx) + Math.abs(dy);
   }, { passive: false });
   layer.addEventListener('touchend', e => {
-    // A short, near-stationary tap = break (like a left click).
-    if (move < 10 && performance.now() - start < 250) commands.break = true;
+    commands.break = false;
     id = null;
   }, { passive: false });
 }
@@ -133,4 +133,5 @@ function buildButtons() {
   mk('»', W - 170, innerHeight - 110, () => commands.sprint = true, () => commands.sprint = false);
   mk('Place', W - 170, innerHeight - 190, () => commands.place = true);
   mk('Use', W - 250, innerHeight - 190, () => commands.interact = true);
+  mk('Craft', W - 250, innerHeight - 110, () => commands.openInventory = true);
 }

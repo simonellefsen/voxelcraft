@@ -1,8 +1,9 @@
 // game/interaction.js
-// Raycast targeting, block break/place, hotbar UI, and the input bindings
-// (keys + mouse) that drive them.
+// Raycast targeting, block break/place, hotbar UI, and input bindings. The
+// hotbar is backed by the player's inventory; mining is tool-aware (speed +
+// durability + progress). All input arrives via the unified command layer.
 
-import { SCALE, EYE, AIR, HOTBAR_BLOCKS, BLOCK_NAMES, BLOCK_SWATCH } from '../core/config.js';
+import { SCALE, EYE, AIR, BLOCK_SWATCH } from '../core/config.js';
 import { getTHREE } from '../core/three.js';
 import { getBlock, setBlock } from '../world/world.js';
 import { allMeshes, highlight } from '../engine/renderer.js';
@@ -11,14 +12,18 @@ import { input } from '../engine/input.js';
 import { commands, consumeActions, consumeSelect } from '../engine/input/commands.js';
 import { player, triggerSwing } from './player.js';
 import { playMine, playPlace } from '../engine/audio.js';
-import { showMenu, showError } from './ui.js';
+import { showError, toggleCraft } from './ui.js';
+import { inventory, HOTBAR } from './inventory/playerInventory.js';
+import { ITEMS, isTool, placeBlockOf, miningTime } from '../world/items/items.js';
+import { spawnDrop } from './entities/drops.js';
 
 let selected = 0;
 let target = null;
-let raycaster = null; // created in initInteraction (needs THREE)
+let raycaster = null;
 let center = null;
-let cursorNDC = null;  // desktop free-look aim (from commands.cursorX/Y)
-let downTime = 0;
+let cursorNDC = null;
+let breaking = null;       // { x, y, z, progress, toolId }
+let hotbarEls = [];
 
 const hotbar = document.getElementById('hotbar');
 
@@ -47,20 +52,21 @@ export function updateTarget() {
   }
 }
 
-export function getSelectedName() { return BLOCK_NAMES[HOTBAR_BLOCKS[selected]]; }
-
-/** Returns a textual label for the current break target, e.g. "Grass @ (x,y,z)". */
+export function getSelectedName() {
+  const s = inventory.get(selected);
+  return s ? (ITEMS[s.id] && ITEMS[s.id].name) || 'Item' : 'Empty';
+}
 export function getTargetLabel() {
   if (!target) return 'none';
   const { x, y, z } = target.breakB;
   const id = getBlock(x, y, z);
-  const name = BLOCK_NAMES[id] || 'Air';
+  const name = (ITEMS[id] && ITEMS[id].name) || 'Air';
   return `${name} @ (${x}, ${y}, ${z})`;
 }
 
 export function selectSlot(i) {
-  selected = i;
-  [...hotbar.children].forEach((c, k) => c.classList.toggle('active', k === i));
+  selected = Math.max(0, Math.min(HOTBAR - 1, i));
+  hotbarEls.forEach((el, k) => el.classList.toggle('active', k === selected));
 }
 
 function inPlayer(x, y, z) {
@@ -70,54 +76,102 @@ function inPlayer(x, y, z) {
           y >= Math.floor(p.y) && y <= Math.floor(p.y + 1.8));
 }
 
-export function breakBlock() {
-  try {
-    updateTarget();
-    if (!target) { showError('break: no target'); return; }
-    const { x, y, z } = target.breakB;
-    if (getBlock(x, y, z) !== AIR) {
-      setBlock(x, y, z, AIR);
-      playMine();
-      triggerSwing();
+function renderHotbarUI() {
+  for (let i = 0; i < HOTBAR; i++) {
+    const el = hotbarEls[i];
+    if (!el) continue;
+    const s = inventory.get(i);
+    if (!s) { el.innerHTML = `<span class="num">${i + 1}</span>`; continue; }
+    const def = ITEMS[s.id];
+    if (def && def.placeBlock != null) {
+      el.innerHTML = `<span class="num">${i + 1}</span><span class="sw" style="background:${BLOCK_SWATCH[s.id] || '#888'}"></span>`;
+    } else {
+      const label = def ? def.name.slice(0, 2) : '?';
+      el.innerHTML = `<span class="num">${i + 1}</span><span class="lbl">${label}</span>`;
     }
-  } catch (err) { showError('break error: ' + (err && err.message)); console.error(err); }
+    el.classList.toggle('active', i === selected);
+  }
+}
+
+function finalizeBreak(b) {
+  const id = getBlock(b.x, b.y, b.z);
+  if (id === AIR) return;
+  setBlock(b.x, b.y, b.z, AIR);
+  spawnDrop(b.x + 0.5, b.y + 0.5, b.z + 0.5, id, 1);
+  const slot = inventory.get(selected);
+  if (slot && isTool(slot.id)) inventory.damageSlot(selected);
+  playMine();
+  triggerSwing();
+}
+
+/** Tool-aware mining progress while the break command is held. */
+function updateMining(dt) {
+  if (!commands.break || !input.playing || !target) { breaking = null; return; }
+  const b = target.breakB;
+  const id = getBlock(b.x, b.y, b.z);
+  if (id === AIR) { breaking = null; return; }
+  const slot = inventory.get(selected);
+  const toolId = slot && slot.id ? slot.id : 0;
+  if (!breaking || breaking.x !== b.x || breaking.y !== b.y || breaking.z !== b.z || breaking.toolId !== toolId) {
+    breaking = { x: b.x, y: b.y, z: b.z, toolId, progress: 0 };
+  }
+  breaking.progress += dt / miningTime(toolId, id);
+  if (breaking.progress >= 1) { finalizeBreak(b); breaking = null; }
 }
 
 export function placeBlock() {
-  try {
-    updateTarget();
-    if (!target) { showError('place: no target'); return; }
-    const { x, y, z } = target.place;
-    if (getBlock(x, y, z) === AIR && !inPlayer(x, y, z)) {
-      setBlock(x, y, z, HOTBAR_BLOCKS[selected]);
-      playPlace();
-    }
-  } catch (err) { showError('place error: ' + (err && err.message)); console.error(err); }
+  if (!target) { showError('place: no target'); return; }
+  const { x, y, z } = target.place;
+  const slot = inventory.get(selected);
+  if (!slot) return;
+  const bid = placeBlockOf(slot.id);
+  if (bid == null) return; // selected item isn't placeable
+  if (getBlock(x, y, z) === AIR && !inPlayer(x, y, z)) {
+    setBlock(x, y, z, bid);
+    playPlace();
+  }
 }
 
-/** Wires input listeners. Call once after renderer/init. */
+/** Per-frame interaction tick: target, mining, actions, hotbar UI. */
+export function tickInteractions(dt) {
+  updateTarget();
+  if (input.playing) {
+    updateMining(dt);
+    const a = consumeActions();
+    if (a.place) placeBlock();
+    if (a.interact) { /* TODO: contextual interact */ }
+    if (a.openInventory) toggleCraft();
+  }
+  renderHotbarUI();
+  const s = consumeSelect();
+  if (s >= 0) selectSlot(s);
+}
+
+/** Wires input listeners + builds the hotbar. Call once after renderer/init. */
 export function initInteraction() {
   const THREE = getTHREE();
   raycaster = new THREE.Raycaster();
   center = new THREE.Vector2(0, 0);
   cursorNDC = new THREE.Vector2(0, 0);
 
-  HOTBAR_BLOCKS.forEach((b, i) => {
+  hotbarEls = [];
+  for (let i = 0; i < HOTBAR; i++) {
     const s = document.createElement('div');
     s.className = 'slot';
     s.dataset.i = i;
-    s.innerHTML = `<span class="num">${i + 1}</span><span class="sw" style="background:${BLOCK_SWATCH[b]}"></span>`;
     s.addEventListener('click', () => selectSlot(i));
     hotbar.appendChild(s);
-  });
+    hotbarEls.push(s);
+  }
+  renderHotbarUI();
   selectSlot(0);
 
   addEventListener('keydown', e => {
-    if (e.code === 'Escape') showMenu();
-    if (e.key >= '1' && e.key <= '7') commands.selectSlot = +e.key - 1;
+    if (e.key >= '1' && e.key <= '9') commands.selectSlot = +e.key - 1;
     if (e.code === 'KeyE') commands.break = true;
     if (e.code === 'KeyF') commands.place = true;
   });
+  addEventListener('keyup', e => { if (e.code === 'KeyE') commands.break = false; });
 
   addEventListener('mousedown', e => {
     if (e.target && e.target.closest && e.target.closest('#hotbar, #overlay')) return;
@@ -125,25 +179,8 @@ export function initInteraction() {
     if (e.button === 0) { input.mouseDown = true; commands.break = true; }
     else if (e.button === 2) { commands.place = true; }
   });
-  addEventListener('mouseup', e => { if (e.button === 0) input.mouseDown = false; });
+  addEventListener('mouseup', e => { if (e.button === 0) { input.mouseDown = false; commands.break = false; } });
   addEventListener('contextmenu', e => {
     if (!e.target.closest || !e.target.closest('#hotbar, #overlay')) e.preventDefault();
   });
-}
-
-/**
- * Per-frame interaction tick: updates the target and consumes pending actions
- * (break/place/select) issued through the unified command layer.
- */
-export function tickInteractions() {
-  updateTarget();
-  const a = consumeActions();
-  if (input.playing) {
-    if (a.break) breakBlock();
-    if (a.place) placeBlock();
-    if (a.interact) { /* TODO: contextual interact (chests, beds, NPCs) */ }
-    if (a.openInventory) { /* TODO: open inventory UI */ }
-  }
-  const s = consumeSelect();
-  if (s >= 0) selectSlot(s);
 }

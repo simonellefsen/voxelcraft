@@ -69,6 +69,23 @@ try {
   if (nN === 0) throw new Error('naive mesher produced no faces');
   if (nG > nN) throw new Error('greedy produced MORE faces than naive');
   console.log('GREEDY BENCHMARK OK');
+
+  // Crafting: a recipe that needs Wood must succeed when Wood is present and
+  // fail when it isn't, consuming inputs and producing the output.
+  const { inventory } = await import('../src/game/inventory/playerInventory.js');
+  const { RECIPES, canCraft, craft } = await import('../src/world/items/recipes.js');
+  const { WOOD } = await import('../src/core/config.js');
+  const { WOOD_PICK } = await import('../src/world/items/items.js');
+  const woodPick = RECIPES.find(r => r.id === 'wood_pick');
+  const countPick = () => inventory.slots.filter(s => s && s.id === WOOD_PICK).length;
+  inventory.slots.forEach((_, i) => inventory.clearAt(i));
+  const pickBefore = countPick();
+  if (canCraft(inventory, woodPick)) throw new Error('should not craft without wood');
+  inventory.add(WOOD, 3);
+  if (!canCraft(inventory, woodPick)) throw new Error('should craft with wood');
+  if (!craft(inventory, woodPick)) throw new Error('craft() failed');
+  if (countPick() !== pickBefore + 1) throw new Error('craft did not produce a pickaxe');
+  console.log('CRAFTING OK');
 } catch (e) {
   console.error('BOOT FAIL:', e);
   process.exit(1);
