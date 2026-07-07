@@ -1639,3 +1639,139 @@ This consistent interaction pipeline ensures all gameplay systems—breaking blo
 
 This level of detail gives a coding LLM enough information to implement the player controller, interaction system, and core gameplay loop without having to infer how a Minecraft-like game is supposed to behave.
 
+--
+
+# MOBILE
+
+What works well
+
+A browser-based voxel game can support:
+
+Walking around a 3D world
+Looking around with touch gestures
+Breaking and placing blocks
+Building structures
+Opening inventories and containers
+Basic crafting
+Single-player worlds
+Moderate render distances (e.g. 4–8 chunks)
+
+With a well-optimized engine (greedy meshing, frustum culling, asynchronous chunk generation, texture atlases), modern iPhones can provide a smooth experience.
+
+The biggest challenge: controls
+
+Desktop Minecraft effectively uses:
+
+WASD
+Mouse movement
+Left click
+Right click
+Shift
+Space
+Number keys
+E
+Q
+F
+Scroll wheel
+
+None of those exist on an iPhone.
+
+Instead, use a touch-first control scheme:
+
+Left thumb
+
+Virtual joystick for movement
+
+Right thumb
+
+Swipe to look around
+
+Context buttons
+
+Jump
+Sneak
+Sprint
+Interact
+Inventory
+
+Tap on a block
+
+Select it
+
+Hold on a block
+
+Break it
+
+Tap an adjacent face
+
+Place the selected block
+
+A bottom hotbar (8–10 slots) works well, with tap-to-select and long-press for additional options.
+
+Interaction design
+
+Avoid mapping every desktop action directly. Instead, make interactions contextual.
+
+For example:
+
+Looking at a chest + tapping "Interact" opens it.
+Looking at a bed + tapping "Interact" sleeps.
+Looking at a villager + tapping "Interact" starts trading.
+Looking at a crafting table + tapping "Interact" opens the crafting UI.
+
+The player doesn't need separate keys for every action.
+
+Performance considerations
+
+Mobile browsers have tighter CPU, GPU, and memory budgets. Design with these in mind:
+
+Keep chunk sizes modest (e.g. 16×16×128).
+Generate terrain in background workers.
+Use greedy meshing to minimize geometry.
+Batch draw calls aggressively.
+Limit render distance on mobile.
+Pause or reduce updates for distant entities.
+Mobile-specific UI
+
+The UI should adapt to touch:
+
+Larger buttons and touch targets.
+Simplified inventory grids.
+Drag-and-drop item movement.
+Crafting recipes selectable with taps rather than arranging every ingredient manually (optionally offering both modes).
+Browser limitations
+
+The main limitations are browser APIs rather than hardware:
+
+Persistent storage quotas vary by browser.
+Background execution is limited.
+Memory limits are lower than on desktop.
+Some advanced graphics features may not be available uniformly across browsers.
+
+Despite that, a browser game can still provide a substantial experience.
+
+Recommended architecture
+
+Treat mobile as a first-class platform rather than an afterthought. Structure input like this:
+
+Input Layer
+    │
+    ├── Keyboard + Mouse
+    ├── Touch
+    ├── Gamepad
+    └── Future XR
+           │
+           ▼
+Unified Player Commands
+    ├── Move
+    ├── Look
+    ├── Jump
+    ├── Break Block
+    ├── Place Block
+    ├── Interact
+    ├── Open Inventory
+    └── Select Hotbar Slot
+
+The rest of the game should only consume these high-level commands, making it easy to support desktop, mobile, and game controllers without changing gameplay logic.
+
+Overall, a browser-based Minecraft-like game can absolutely run meaningfully on iPhone Safari or Chrome, but it should feel like a touch-native voxel game rather than a desktop game squeezed onto a phone. Designing the input and UI around touch from the outset will produce a much better experience than trying to emulate keyboard-and-mouse controls.

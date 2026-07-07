@@ -4,10 +4,12 @@
 // because chunk building is budgeted via world.processQueue().
 
 import { initThree, getTHREE } from './core/three.js';
-import { SX, SZ } from './core/config.js';
+import { SX, SZ, CHUNK } from './core/config.js';
 import { world } from './world/world.js';
-import { initRenderer, camera, renderer, scene, sync } from './engine/renderer.js';
+import { initRenderer, camera, renderer, scene, sync, applyTime, allMeshes } from './engine/renderer.js';
+import { initMaterials } from './engine/materials.js';
 import { initInput } from './engine/input.js';
+import { TimeOfDay } from './engine/time.js';
 import { initPlayer, player, move, updateCharacter } from './game/player.js';
 import { spawnEntities, updateEntities } from './game/entities.js';
 import {
@@ -16,6 +18,8 @@ import {
 import { initUI, showError, updateHud, updateDiagnostics } from './game/ui.js';
 import { input } from './engine/input.js';
 
+const RENDER_DIST = 16; // chunks — exceeds fog distance so the world looks full
+
 window.addEventListener('error', e => showError(e.message || e.error || e));
 window.addEventListener('unhandledrejection', e => showError((e.reason && e.reason.message) || e.reason));
 
@@ -23,11 +27,12 @@ window.addEventListener('unhandledrejection', e => showError((e.reason && e.reas
   try {
     await initThree();
 
-    // Load the spawn region synchronously so the player has ground; stream the rest.
+    // Build the texture atlas + materials before any chunk is meshed.
+    initMaterials();
+
+    // Load the spawn region synchronously so the player has ground; the rest
+    // streams in via updateVisibleChunks() + processQueue() each frame.
     world.loadArea(SX / 2, SZ / 2, 4);
-    const CX = Math.ceil(SX / 16), CZ = Math.ceil(SZ / 16);
-    for (let cx = 0; cx < CX; cx++)
-      for (let cz = 0; cz < CZ; cz++) world.queueChunk(cx, cz);
 
     initRenderer();
     initInput();
@@ -35,14 +40,16 @@ window.addEventListener('unhandledrejection', e => showError((e.reason && e.reas
     initInteraction();
     initUI();
     spawnEntities();
-    startLoop();
+
+    const time = new TimeOfDay();
+    startLoop(time);
   } catch (e) {
     showError((e && e.message) || e);
     throw e;
   }
 })();
 
-function startLoop() {
+function startLoop(time) {
   const THREE = getTHREE();
   const clock = new THREE.Clock();
   let fps = 0, acc = 0, frames = 0;
@@ -51,9 +58,11 @@ function startLoop() {
     requestAnimationFrame(loop);
     const dt = Math.min(clock.getDelta(), 0.05);
 
-    // Stream chunk generation in a per-frame budget (non-blocking).
+    time.update(dt);
+    world.updateVisibleChunks(player.pos.x, player.pos.z, RENDER_DIST);
     world.processQueue(6);
     sync(world);
+    applyTime(time);
 
     if (input.playing) {
       move(dt);
@@ -71,15 +80,26 @@ function startLoop() {
     acc += dt; frames++;
     if (acc >= 0.5) { fps = Math.round(frames / acc); acc = 0; frames = 0; }
     const c = camera.current.position;
+    const faces = allMeshes.reduce((s, m) => s + (m.geometry.index ? m.geometry.index.count / 3 : 0), 0);
     updateDiagnostics({
       fps,
       camX: c.x, camY: c.y, camZ: c.z,
       px: player.pos.x, py: player.pos.y, pz: player.pos.z,
       chunks: world.chunks.size,
+      faces,
+      time: formatTime(time.t),
       target: getTargetLabel(),
     });
 
     renderer.current.render(scene.current, camera.current);
   }
   loop();
+}
+
+/** t in [0,1) -> HH:MM string. */
+function formatTime(t) {
+  const total = Math.floor(t * 24 * 60);
+  const h = String(Math.floor(total / 60)).padStart(2, '0');
+  const m = String(total % 60).padStart(2, '0');
+  return `${h}:${m}`;
 }

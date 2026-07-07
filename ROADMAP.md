@@ -32,13 +32,41 @@ streaming, save, biomes, lighting later.
 - [x] `renderer.sync(world)` reconciles scene with chunk meshes; rebuilds dirty chunks.
 - [x] Bootstrap: load spawn area synchronously, stream the rest without blocking the loop.
 - [x] Boot-test passes; rebuild path (`setBlock` -> dirty -> rebuild) verified.
-- [ ] Commit & push.
+- [x] Commit & push.
 
-## Milestone 3 — Rendering upgrade (PLANNED)
-- [ ] Procedural canvas texture atlas + material/shader manager (`assets/textures`).
-- [ ] Day/night cycle with sky color + ambient light changes.
-- [ ] Greedy meshing (benchmark vs naive face culling first).
-- [ ] Render-distance-based `updateVisibleChunks` streaming (infinite terrain).
+## Milestone 3 — Rendering upgrade (IN PROGRESS)
+- [x] Procedural canvas texture atlas (`assets/textures/atlas.js`) — 16×16 tiles, no external files.
+- [x] Material manager (`engine/materials.js`) sharing the atlas; opaque + transparent passes.
+- [x] Day/night cycle (`engine/time.js`): sky/fog colour + brightness tint applied each frame.
+- [x] `meshing.buildChunk` now emits UVs (face culling) and uses the atlas; vertex colors removed.
+- [x] `meshing.buildChunkGreedy` implemented + benchmarked (fewer triangles than naive).
+- [x] Render-distance streaming via `world.updateVisibleChunks` + `processQueue` budget in the loop.
+- [ ] Flip `USE_GREEDY = true` once verified in-browser (currently default OFF per DESIGN "benchmark before replacing").
+- [x] Commit & push Milestone 3.
+
+## Milestone 7 — Mobile (PLANNED)
+Per DESIGN.md "MOBILE": treat mobile as a first-class platform; structure input as a
+unified command layer so desktop/touch/gamepad share gameplay logic.
+
+### Input layer (unified Player Commands)
+- [ ] `engine/input/` split into low-level sources (keyboard/mouse, touch) + a
+      `commands` module emitting high-level: Move, Look, Jump, Break, Place,
+      Interact, OpenInventory, SelectSlot.
+- [ ] Touch controls: left-thumb virtual joystick (Move), right-thumb swipe (Look).
+- [ ] Context buttons: Jump, Sneak, Sprint, Interact, Inventory.
+- [ ] Tap block = select/break; tap adjacent face = place selected block.
+- [ ] Hotbar tap-to-select; long-press for extra options.
+
+### Mobile UI
+- [ ] Detect touch / small screens; enlarge buttons + touch targets.
+- [ ] Simplified inventory grid; drag-and-drop item movement.
+- [ ] Crafting recipes selectable by tap (keep manual mode optional).
+
+### Performance for mobile
+- [ ] Auto-reduce render distance on touch devices (4–8 chunks).
+- [ ] Pause / throttle updates for distant entities.
+- [ ] Generate terrain in a Web Worker (background, non-blocking).
+- [ ] Aggressive draw-call batching (already share atlas materials; verify counts).
 
 ## Milestone 4 — Gameplay depth (PLANNED)
 - [ ] Data-driven items/tools; inventory module (hotbar backed by inventory).

@@ -1,11 +1,15 @@
 // world/meshing.js
-// Builds Three.js meshes for a chunk from the World store. Uses
-// world.getBlock for neighbour lookups so faces on chunk borders are culled
-// correctly. Pure geometry generation — no scene/render concerns here.
+// Builds Three.js geometry for a chunk from the World store. Two strategies:
+//   buildChunk      — face culling (default, proven)
+//   buildChunkGreedy — greedy meshing (benchmarked; fewer triangles)
+// Both emit positions + UVs (no vertex colors); the renderer applies the
+// shared atlas materials. Neighbour lookups use world.getBlock so chunk
+// borders cull correctly.
 
 import { SCALE, CHUNK, SY } from '../core/config.js';
 import { getTHREE } from '../core/three.js';
-import { isOpaque, isTransparent, blockColor } from './blocks/block.js';
+import { isOpaque, isTransparent } from './blocks/block.js';
+import { tileFor, getAtlas } from '../assets/textures/atlas.js';
 
 const FACES = [
   { dir: [ 1, 0, 0], corners: [[1,0,0],[1,1,0],[1,1,1],[1,0,1]] },
@@ -16,28 +20,20 @@ const FACES = [
   { dir: [ 0, 0,-1], corners: [[0,0,0],[0,1,0],[1,1,0],[1,0,0]] },
 ];
 
-function makeMesh(THREE, positions, colors, index, transparent) {
+function makeGeometry(THREE, positions, uvs, indices) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  g.setIndex(index);
-  const m = new THREE.MeshBasicMaterial({
-    vertexColors: true, side: THREE.DoubleSide,
-    transparent: transparent, opacity: transparent ? 0.6 : 1.0,
-  });
-  return new THREE.Mesh(g, m);
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  g.setIndex(indices);
+  return g;
 }
 
-/**
- * Builds { opaque, transparent } meshes for a chunk.
- * @param {import('./world.js').World} world  source of voxel data
- * @param {import('./chunks/chunk.js').Chunk} chunk
- * @returns {{opaque: any, transparent: any}}
- */
+/** @returns {{opaque: any|null, transparent: any|null}} geometry (or null) */
 export function buildChunk(world, chunk) {
   const THREE = getTHREE();
+  const atlas = getAtlas();
   const x0 = chunk.cx * CHUNK, z0 = chunk.cz * CHUNK;
-  const op = [], oc = [], oi = [];
+  const op = [], oc = [], oi = [];   // oc holds uvs here
   const tr = [], tc = [], ti = [];
 
   for (let z = 0; z < CHUNK; z++)
@@ -47,25 +43,126 @@ export function buildChunk(world, chunk) {
         if (id === 0) continue;
         const gx = x0 + x, gz = z0 + z;
         const transparent = isTransparent(id);
-        const arr = transparent ? tr : op, carr = transparent ? tc : oc, iarr = transparent ? ti : oi;
+        const arr = transparent ? tr : op, uar = transparent ? tc : oc, iarr = transparent ? ti : oi;
         for (const f of FACES) {
           const nb = world.getBlock(gx + f.dir[0], y + f.dir[1], gz + f.dir[2]);
           const visible = transparent ? (nb === 0) : !isOpaque(nb);
           if (!visible) continue;
-          const col = blockColor(id, f.dir);
+          const uv = atlas.uv(tileFor(id, f.dir));
           const base = arr.length / 3;
           for (let i = 0; i < 4; i++) {
             arr.push((gx + f.corners[i][0]) * SCALE, (y + f.corners[i][1]) * SCALE, (gz + f.corners[i][2]) * SCALE);
-            carr.push(col[0], col[1], col[2]);
+            uar.push(i === 0 ? uv[0] : i === 1 ? uv[2] : uv[2],
+                     i === 0 ? uv[1] : i === 1 ? uv[1] : uv[3]);
           }
           iarr.push(base, base + 1, base + 2, base, base + 2, base + 3);
         }
       }
 
-  return {
-    opaque: makeMesh(THREE, op, oc, oi, false),
-    transparent: makeMesh(THREE, tr, tc, ti, true),
-  };
+  const opaque = op.length ? makeGeometry(THREE, op, oc, oi) : null;
+  const transparent = tr.length ? makeGeometry(THREE, tr, tc, ti) : null;
+  return { opaque, transparent };
 }
 
-export { FACES };
+// ---- Greedy meshing (benchmarked alternative) ----
+
+const DIRS = [
+  { n: [ 1, 0, 0], u: 'z', v: 'y' }, // +X
+  { n: [-1, 0, 0], u: 'z', v: 'y' }, // -X
+  { n: [ 0, 1, 0], u: 'x', v: 'z' }, // +Y
+  { n: [ 0,-1, 0], u: 'x', v: 'z' }, // -Y
+  { n: [ 0, 0, 1], u: 'x', v: 'y' }, // +Z
+  { n: [ 0, 0,-1], u: 'x', v: 'y' }, // -Z
+];
+
+function rangeOf(axis) { return axis === 'y' ? SY : CHUNK; }
+
+function coordAt(dir, L, iu, iv, x0, z0) {
+  const n = dir.n, u = dir.u, v = dir.v;
+  let x = x0, y = 0, z = z0;
+  if (n[0] !== 0) x += L;
+  if (n[1] !== 0) y += L;
+  if (n[2] !== 0) z += L;
+  if (u === 'x') x += iu; else if (u === 'y') y += iu; else z += iu;
+  if (v === 'x') x += iv; else if (v === 'y') y += iv; else z += iv;
+  return [x, y, z];
+}
+
+function anchor(dir, L, iu, iv, x0, z0) {
+  const n = dir.n, u = dir.u, v = dir.v;
+  let ox = x0, oy = 0, oz = z0;
+  if (n[0] !== 0) ox = x0 + L + (n[0] > 0 ? 1 : 0);
+  if (n[1] !== 0) oy = L + (n[1] > 0 ? 1 : 0);
+  if (n[2] !== 0) oz = z0 + L + (n[2] > 0 ? 1 : 0);
+  if (u === 'x') ox += iu; else if (u === 'y') oy += iu; else oz += iu;
+  if (v === 'x') ox += iv; else if (v === 'y') oy += iv; else oz += iv;
+  return [ox, oy, oz];
+}
+
+function emitQuad(pos, uvs, idx, u, v, ox, oy, oz, su, sv, uvTile) {
+  const corner = (ku, kv) => {
+    let x = ox, y = oy, z = oz;
+    if (u === 'x') x += ku; else if (u === 'y') y += ku; else z += ku;
+    if (v === 'x') x += kv; else if (v === 'y') y += kv; else z += kv;
+    return [x * SCALE, y * SCALE, z * SCALE];
+  };
+  const c0 = corner(0, 0), c1 = corner(su, 0), c2 = corner(su, sv), c3 = corner(0, sv);
+  const base = pos.length / 3;
+  pos.push(...c0, ...c1, ...c2, ...c3);
+  uvs.push(uvTile[0], uvTile[1], uvTile[2], uvTile[1], uvTile[2], uvTile[3], uvTile[0], uvTile[3]);
+  idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+}
+
+/** @returns {{opaque: any|null, transparent: any|null}} geometry (or null) */
+export function buildChunkGreedy(world, chunk) {
+  const THREE = getTHREE();
+  const atlas = getAtlas();
+  const x0 = chunk.cx * CHUNK, z0 = chunk.cz * CHUNK;
+
+  const op = { pos: [], uv: [], idx: [] };
+  const tr = { pos: [], uv: [], idx: [] };
+
+  for (const dir of DIRS) {
+    const n = dir.n, u = dir.u, v = dir.v;
+    const mu = rangeOf(u), mv = rangeOf(v);
+    const normalAxis = n[0] ? 'x' : n[1] ? 'y' : 'z';
+    const nRange = rangeOf(normalAxis);
+
+    for (let L = 0; L < nRange; L++) {
+      const mask = Array.from({ length: mv }, () => new Array(mu).fill(0));
+      for (let iv = 0; iv < mv; iv++)
+        for (let iu = 0; iu < mu; iu++) {
+          const coord = coordAt(dir, L, iu, iv, x0, z0);
+          const id = world.getBlock(coord[0], coord[1], coord[2]);
+          if (id === 0) continue;
+          const nb = world.getBlock(coord[0] + n[0], coord[1] + n[1], coord[2] + n[2]);
+          const vis = isTransparent(id) ? (nb === 0) : !isOpaque(nb);
+          if (vis) mask[iv][iu] = id;
+        }
+
+      for (let vv = 0; vv < mv; ) {
+        for (let uu = 0; uu < mu; ) {
+          const id = mask[vv][uu];
+          if (!id) { uu++; continue; }
+          let w = 1; while (uu + w < mu && mask[vv][uu + w] === id) w++;
+          let h = 1;
+          grow: while (vv + h < mv) {
+            for (let k = 0; k < w; k++) if (mask[vv + h][uu + k] !== id) break grow;
+            h++;
+          }
+          const tgt = isTransparent(id) ? tr : op;
+          const uvTile = atlas.uv(tileFor(id, n));
+          const a = anchor(dir, L, uu, vv, x0, z0);
+          emitQuad(tgt.pos, tgt.uv, tgt.idx, u, v, a[0], a[1], a[2], w, h, uvTile);
+          for (let dv = 0; dv < h; dv++) for (let du = 0; du < w; du++) mask[vv + dv][uu + du] = 0;
+          uu += w;
+        }
+        vv++;
+      }
+    }
+  }
+
+  const opaque = op.pos.length ? makeGeometry(THREE, op.pos, op.uv, op.idx) : null;
+  const transparent = tr.pos.length ? makeGeometry(THREE, tr.pos, tr.uv, tr.idx) : null;
+  return { opaque, transparent };
+}

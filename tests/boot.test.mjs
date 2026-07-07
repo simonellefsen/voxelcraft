@@ -10,10 +10,14 @@ function fakeEl() {
     set innerHTML(v) {}, closest() { return null; },
   };
 }
+function makeCanvas() {
+  const ctx = new Proxy({}, { get: () => (() => {}), set: () => true });
+  return { width: 0, height: 0, style: {}, getContext: () => ctx };
+}
 global.document = {
   getElementById: () => fakeEl(),
   querySelector: () => fakeEl(),
-  createElement: () => fakeEl(),
+  createElement: (tag) => (tag === 'canvas' ? makeCanvas() : fakeEl()),
   body: fakeEl(),
   addEventListener: noop,
 };
@@ -51,6 +55,20 @@ try {
   world.processQueue(8);
   sync(world);
   console.log('WORLD EDIT + STREAM SYNC OK');
+
+  // Benchmark: greedy meshing should produce <= naive triangle count.
+  const { buildChunk, buildChunkGreedy } = await import('../src/world/meshing.js');
+  world.loadChunk(0, 0);
+  const chunk = world.getChunk(0, 0);
+  const g1 = buildChunk(world, chunk);
+  const g2 = buildChunkGreedy(world, chunk);
+  const tris = g => (g && g.index ? g.index.count / 3 : 0);
+  const nN = tris(g1.opaque) + tris(g1.transparent);
+  const nG = tris(g2.opaque) + tris(g2.transparent);
+  console.log(`faces  naive=${nN}  greedy=${nG}`);
+  if (nN === 0) throw new Error('naive mesher produced no faces');
+  if (nG > nN) throw new Error('greedy produced MORE faces than naive');
+  console.log('GREEDY BENCHMARK OK');
 } catch (e) {
   console.error('BOOT FAIL:', e);
   process.exit(1);
