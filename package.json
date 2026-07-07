@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "serve": "python3 -m http.server 8000",
-    "check": "for f in $(find src -name '*.js'); do node --check \"$f\" || exit 1; done"
+    "check": "for f in $(find src -name '*.js'); do node --check \"$f\" || exit 1; done",
+    "test": "node --loader ./tests/loader.mjs ./tests/boot.test.mjs"
   },
   "private": true
 }

@@ -5,7 +5,7 @@
 import { SCALE, EYE, AIR, HOTBAR_BLOCKS, BLOCK_NAMES, BLOCK_SWATCH } from '../core/config.js';
 import { getTHREE } from '../core/three.js';
 import { getBlock, setBlock } from '../world/world.js';
-import { allMeshes, highlight, rebuildAt } from '../engine/renderer.js';
+import { allMeshes, highlight } from '../engine/renderer.js';
 import { camera } from '../engine/renderer.js';
 import { input } from '../engine/input.js';
 import { player, triggerSwing } from './player.js';
@@ -73,7 +73,6 @@ export function breakBlock() {
     const { x, y, z } = target.breakB;
     if (getBlock(x, y, z) !== AIR) {
       setBlock(x, y, z, AIR);
-      rebuildAt(x, y, z);
       playMine();
       triggerSwing();
     }
@@ -87,7 +86,6 @@ export function placeBlock() {
     const { x, y, z } = target.place;
     if (getBlock(x, y, z) === AIR && !inPlayer(x, y, z)) {
       setBlock(x, y, z, HOTBAR_BLOCKS[selected]);
-      rebuildAt(x, y, z);
       playPlace();
     }
   } catch (err) { showError('place error: ' + (err && err.message)); console.error(err); }

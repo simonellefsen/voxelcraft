@@ -570,3 +570,1072 @@ Core Engine
 
 This layered approach keeps each subsystem independently testable and understandable, making it well-suited for iterative development by a coding LLM that relies on explicit specifications and textual feedback rather than visual inspection.
 
+--
+
+These sections fit naturally after the "Future Systems" or "Gameplay" section of the specification.
+
+# Core Gameplay
+
+The game is a sandbox survival experience inspired by Minecraft, where the player explores a procedurally generated voxel world, gathers resources, crafts tools, builds structures, and survives against environmental hazards and hostile creatures.
+
+The initial gameplay loop is:
+
+1. Spawn into a randomly generated world.
+2. Gather wood and basic resources.
+3. Craft primitive tools.
+4. Mine stone and ores.
+5. Build shelter before nightfall.
+6. Defend against hostile mobs.
+7. Explore caves and distant biomes.
+8. Progress toward stronger equipment and larger construction projects.
+
+---
+
+# Player Character
+
+The player is a first-person character with the following capabilities:
+
+Movement
+
+* Walking
+* Sprinting
+* Jumping
+* Crouching
+* Swimming
+* Climbing ladders
+* Flying (creative/debug mode)
+
+Interaction
+
+* Break blocks
+* Place blocks
+* Open containers
+* Use tools
+* Craft items
+* Interact with NPCs
+* Pick up dropped items
+* Sleep in beds
+
+Player Statistics
+
+* Health
+* Hunger
+* Saturation (optional)
+* Experience
+* Armor
+* Air (underwater)
+
+Inventory
+
+* Hotbar
+* Main inventory
+* Armor slots
+* Off-hand slot (optional)
+
+---
+
+# Items and Tools
+
+Items should be data-driven rather than hardcoded whenever possible.
+
+Basic Tool Categories
+
+* Wooden tools
+* Stone tools
+* Iron tools
+* Gold tools
+* Diamond tools
+* Netherite-equivalent (future)
+
+Tool Types
+
+* Pickaxe
+* Axe
+* Shovel
+* Hoe
+* Sword
+* Bow
+* Crossbow (future)
+* Fishing Rod
+* Shears
+* Flint and Steel
+* Bucket
+* Compass
+* Clock
+* Shield
+
+Each tool defines:
+
+* Durability
+* Mining speed
+* Damage
+* Effective block types
+* Enchantability (future)
+
+---
+
+# Resources
+
+Common Resources
+
+* Wood
+* Stone
+* Dirt
+* Sand
+* Gravel
+* Clay
+
+Ores
+
+* Coal
+* Iron
+* Copper
+* Gold
+* Redstone
+* Lapis
+* Diamond
+* Emerald
+
+Crafting Materials
+
+* Sticks
+* Planks
+* String
+* Leather
+* Wool
+* Bones
+* Feathers
+* Gunpowder
+
+Food
+
+* Apples
+* Bread
+* Meat
+* Fish
+* Eggs
+* Carrots
+* Potatoes
+* Berries
+
+---
+
+# Living Creatures
+
+Every creature should inherit from a common Entity class.
+
+Example hierarchy:
+
+Entity
+↓
+LivingEntity
+↓
+Animal / Monster / NPC
+
+Each entity contains:
+
+* Position
+* Rotation
+* Velocity
+* Health
+* AI state
+* Collision bounds
+* Animation state
+* Inventory (optional)
+
+---
+
+# Passive Animals
+
+Initial passive creatures:
+
+* Sheep
+* Cow
+* Pig
+* Chicken
+* Rabbit
+* Horse
+* Wolf
+* Cat
+* Bee
+* Fish
+
+Behaviors:
+
+* Wander randomly
+* Avoid danger
+* Eat or graze (optional)
+* Breed
+* Follow food when appropriate
+* Drop resources on death
+
+---
+
+# Hostile Creatures
+
+Initial hostile mobs:
+
+* Zombie
+* Skeleton
+* Creeper
+* Spider
+* Slime
+* Enderman (later)
+* Witch (later)
+
+Typical behaviors:
+
+* Spawn in darkness
+* Detect nearby players
+* Navigate around obstacles
+* Attack when in range
+* Burn in daylight where appropriate
+* Drop loot
+
+Special behaviors:
+
+Creeper
+
+* Moves quietly
+* Explodes after a fuse when close to the player
+* Damages terrain (configurable)
+
+Zombie
+
+* Walks toward players
+* Can break simple obstacles in harder difficulties (future)
+
+Skeleton
+
+* Uses ranged attacks
+* Attempts to maintain distance
+
+Spider
+
+* Climbs walls
+* More aggressive at night
+
+Slime
+
+* Splits into smaller slimes when defeated
+
+---
+
+# NPCs
+
+Initial NPC types:
+
+Villager
+
+* Lives in villages
+* Wanders during the day
+* Sleeps at night
+* Trades items
+* Uses profession-specific workstations
+
+Future NPCs:
+
+* Wandering Trader
+* Iron Golem
+* Custom villagers
+* Quest givers (optional)
+
+Villagers should use a schedule-based AI system rather than scripted paths.
+
+---
+
+# World Spawning
+
+Spawn rules should be configurable.
+
+Passive mobs:
+
+* Spawn in daylight
+* Prefer grass blocks
+* Require sufficient space
+
+Hostile mobs:
+
+* Spawn below a configurable light level
+* Spawn outside a safe radius around the player
+* Limited by a population cap
+
+Ambient entities:
+
+* Bats
+* Fish
+* Butterflies (optional)
+* Fireflies (optional)
+
+Spawn manager responsibilities:
+
+* Population limits
+* Biome restrictions
+* Spawn weighting
+* Despawn rules
+* Performance budgeting
+
+---
+
+# Day and Night Cycle
+
+The world runs on a configurable day/night cycle.
+
+Example:
+
+* Sunrise
+* Morning
+* Noon
+* Afternoon
+* Sunset
+* Night
+* Midnight
+* Dawn
+
+The cycle affects:
+
+* Sky color
+* Ambient light
+* Shadows
+* Mob spawning
+* Animal behavior
+* Villager schedules
+* Player visibility
+
+Optional weather system:
+
+* Clear
+* Rain
+* Thunderstorm
+* Snow (biome dependent)
+
+Weather influences:
+
+* Lighting
+* Ambient sounds
+* Visibility
+* Crop growth (future)
+
+---
+
+# Artificial Intelligence
+
+NPC AI should use modular behavior trees or utility AI rather than large conditional blocks.
+
+Typical behaviors include:
+
+* Idle
+* Wander
+* Follow
+* Flee
+* Search
+* Attack
+* Trade
+* Sleep
+* Work
+* Eat
+* Patrol
+
+Every behavior should be independently testable.
+
+---
+
+# Biomes
+
+Initial biome set:
+
+* Plains
+* Forest
+* Birch Forest
+* Desert
+* Taiga
+* Mountains
+* Ocean
+* River
+* Swamp
+* Beach
+
+Future biomes:
+
+* Jungle
+* Savanna
+* Badlands
+* Snow
+* Mushroom Island
+
+Each biome specifies:
+
+* Terrain generation
+* Surface blocks
+* Vegetation
+* Trees
+* Weather
+* Spawn tables
+* Ambient colors
+* Music
+* Structures
+
+---
+
+# Structures
+
+World generation should support procedurally placed structures.
+
+Examples:
+
+* Villages
+* Mineshafts
+* Caves
+* Ruined portals
+* Dungeons
+* Strongholds (future)
+* Temples
+* Shipwrecks
+
+Structure generation should occur after terrain generation and before chunk finalization.
+
+---
+
+# Gameplay Progression
+
+Progression is driven by exploration, crafting, and resource acquisition rather than levels.
+
+Typical progression:
+
+Wood
+→ Stone
+→ Iron
+→ Diamond
+→ Advanced equipment
+
+Each progression tier unlocks:
+
+* Faster tools
+* Stronger weapons
+* Better armor
+* New crafting recipes
+* Access to more dangerous environments
+
+These additions give the coding LLM a much richer understanding of the intended gameplay while still keeping the specification modular and implementation-oriented.
+
+--
+
+This is worth specifying in much more detail because it defines the primary interaction model of the game. I'd describe it almost like a technical design document so the coding LLM understands both **what the player experiences** and **how the engine should implement it**.
+
+# Player Character and World Interaction
+
+The player is represented in the world as a first-person entity occupying physical space. The player is not simply a camera; instead, the camera is attached to a simulated character with collision, physics, inventory, and state.
+
+---
+
+# Player Representation
+
+The player consists of several components:
+
+* Physics body
+* Camera
+* Inventory
+* Equipment
+* Health
+* Hunger
+* Input controller
+* Interaction controller
+* Animation state (for multiplayer or third-person)
+* Audio listener
+
+Example:
+
+Player
+├── Transform
+├── Camera
+├── PhysicsBody
+├── Inventory
+├── Equipment
+├── HealthComponent
+├── HungerComponent
+├── InteractionComponent
+├── MovementController
+└── PlayerState
+
+---
+
+# Position
+
+The player always has:
+
+Position
+
+* X
+* Y
+* Z
+
+Rotation
+
+* Yaw
+* Pitch
+
+Velocity
+
+* X
+* Y
+* Z
+
+Example
+
+Position:
+(125.3, 68.0, -42.7)
+
+Rotation:
+Yaw = 135°
+Pitch = -18°
+
+Velocity:
+(0.0, -0.3, 4.5)
+
+The camera is positioned slightly above the center of the player's collision body to simulate eye height.
+
+---
+
+# Physical Body
+
+Recommended collision shape:
+
+Capsule
+
+or
+
+Axis-Aligned Bounding Box (AABB)
+
+Approximate dimensions:
+
+Width:
+0.6 blocks
+
+Height:
+1.8 blocks
+
+Eye height:
+1.62 blocks
+
+The player cannot pass through solid blocks.
+
+The physics system handles:
+
+* Gravity
+* Jumping
+* Sliding
+* Collision detection
+* Walking up small steps
+* Falling damage
+* Swimming
+* Climbing ladders
+
+---
+
+# Camera
+
+The camera rotates independently of movement.
+
+Mouse movement:
+
+Horizontal movement
+→ adjusts yaw
+
+Vertical movement
+→ adjusts pitch
+
+Pitch should be clamped to prevent looking completely backwards.
+
+Movement direction is computed relative to camera yaw.
+
+---
+
+# Movement
+
+Supported movement states:
+
+* Standing
+* Walking
+* Sprinting
+* Sneaking
+* Jumping
+* Falling
+* Swimming
+* Flying (Creative Mode)
+
+Movement is continuous rather than grid-based.
+
+Movement keys apply acceleration, while friction and gravity influence final velocity.
+
+---
+
+# Looking at the World
+
+The player interacts with the world using a raycast extending from the camera.
+
+Typical ray length:
+
+5 blocks
+
+Every frame:
+
+Camera
+↓
+
+Raycast
+
+↓
+
+Nearest solid block
+
+↓
+
+Interaction Target
+
+The targeted block should be highlighted visually.
+
+---
+
+# Breaking Blocks
+
+Breaking uses the currently equipped tool.
+
+Process:
+
+1. Raycast identifies the targeted block.
+2. Verify the block is breakable.
+3. Determine tool effectiveness.
+4. Apply mining progress over time.
+5. Play particles and sound.
+6. Remove the block.
+7. Spawn dropped item entities.
+8. Mark the containing chunk as dirty.
+9. Rebuild the chunk mesh.
+
+Mining speed depends on:
+
+* Tool type
+* Tool material
+* Block hardness
+* Player effects (future)
+
+Breaking progress should be interruptible if the player changes target.
+
+---
+
+# Placing Blocks
+
+When holding a placeable block:
+
+1. Perform a raycast.
+2. Determine the face that was hit.
+3. Calculate the adjacent empty position.
+4. Validate placement.
+5. Ensure the block does not intersect the player.
+6. Place the block.
+7. Update chunk mesh.
+8. Play placement sound.
+
+Placement rules:
+
+Cannot place inside:
+
+* Player
+* Solid entities
+
+May require support depending on block type.
+
+---
+
+# Using Tools
+
+Every tool defines:
+
+* Durability
+* Mining speed
+* Damage
+* Reach
+* Effective materials
+
+Examples
+
+Pickaxe
+
+Efficient on:
+
+* Stone
+* Ore
+* Metal
+
+Axe
+
+Efficient on:
+
+* Wood
+* Logs
+* Leaves
+
+Shovel
+
+Efficient on:
+
+* Dirt
+* Sand
+* Gravel
+
+Hoe
+
+Used for:
+
+* Farming
+* Soil preparation
+
+Sword
+
+Used for:
+
+* Combat
+
+Bow
+
+Used for:
+
+* Ranged attacks
+
+Bucket
+
+Used for:
+
+* Water
+* Lava
+* Milk
+
+---
+
+# Picking Up Items
+
+Dropped items exist as independent world entities.
+
+Properties:
+
+* Position
+* Velocity
+* Rotation
+* Lifetime
+* Stack count
+* Item type
+
+When the player moves within the pickup radius:
+
+Player
+
+↓
+
+Pickup detection
+
+↓
+
+Inventory insertion
+
+↓
+
+Play pickup sound
+
+↓
+
+Remove world entity
+
+Nearby items of the same type may merge into stacks to reduce entity count.
+
+---
+
+# Opening Containers
+
+Containers include:
+
+* Chest
+* Barrel
+* Furnace
+* Crafting Table
+* Hopper
+* Future storage blocks
+
+Interaction flow:
+
+Player
+
+↓
+
+Raycast
+
+↓
+
+Container
+
+↓
+
+Open UI
+
+↓
+
+Transfer items
+
+The world simulation continues while container interfaces are open unless the game is paused.
+
+---
+
+# Crafting
+
+Crafting can occur using:
+
+Player inventory
+
+or
+
+Crafting Table
+
+Crafting process:
+
+Collect resources
+
+↓
+
+Open crafting interface
+
+↓
+
+Arrange ingredients
+
+↓
+
+Recipe validation
+
+↓
+
+Create output item
+
+↓
+
+Consume ingredients
+
+Recipes should be defined in external JSON or data files rather than hardcoded, making them easy to extend or modify.
+
+---
+
+# Sleeping
+
+Requirements:
+
+* Bed exists
+* Night time
+* No nearby hostile mobs
+
+Interaction:
+
+Player
+
+↓
+
+Use Bed
+
+↓
+
+Sleep animation
+
+↓
+
+Advance time to sunrise
+
+↓
+
+Restore player state
+
+The player wakes at the assigned bed location.
+
+The bed becomes the player's respawn point.
+
+---
+
+# Building Structures
+
+Building is one of the primary gameplay activities.
+
+The player constructs structures by repeatedly placing blocks into the world.
+
+Every placed block permanently modifies the voxel terrain.
+
+Example workflow:
+
+Choose a location.
+
+↓
+
+Flatten the ground.
+
+↓
+
+Gather wood and stone.
+
+↓
+
+Craft tools.
+
+↓
+
+Craft a crafting table.
+
+↓
+
+Craft a door.
+
+↓
+
+Craft a bed.
+
+↓
+
+Craft chests.
+
+↓
+
+Begin construction.
+
+---
+
+# Example: Building a Starter House
+
+Step 1
+
+Clear a flat area approximately:
+
+7 × 7 blocks
+
+Step 2
+
+Create a stone foundation.
+
+Step 3
+
+Build walls four blocks high using wooden planks.
+
+Step 4
+
+Leave openings for:
+
+* Front door
+* Windows
+
+Step 5
+
+Construct a sloped or flat roof using wood or stone slabs.
+
+Step 6
+
+Install a wooden door.
+
+Step 7
+
+Place windows using glass blocks.
+
+Step 8
+
+Create an interior.
+
+Interior example:
+
+* Bed
+* Crafting table
+* Furnace
+* Two chests
+* Torches
+* Simple table
+* Decorative blocks
+
+Example layout:
+
+#########
+#.......#
+#.B...C.#
+#.......#
+#.F.T...#
+#.......#
+#...D...#
+#########
+
+Legend:
+
+# = Wall
+
+B = Bed
+
+C = Chest
+
+F = Furnace
+
+T = Crafting Table
+
+D = Door
+
+Step 9
+
+Place torches on walls to maintain sufficient light and prevent hostile mob spawning inside.
+
+Step 10
+
+Expand the shelter over time by adding:
+
+* Additional storage
+* Second floor
+* Farm
+* Animal pen
+* Mine entrance
+* Defensive wall
+* Watchtower
+* Decorative furniture
+
+---
+
+# Interaction Philosophy
+
+The player should always feel physically connected to the world.
+
+Every interaction follows the same general pattern:
+
+Player Input
+
+↓
+
+Camera Raycast
+
+↓
+
+Target Identification
+
+↓
+
+Interaction Validation
+
+↓
+
+Game Logic
+
+↓
+
+World Update
+
+↓
+
+Chunk Update
+
+↓
+
+Physics Update
+
+↓
+
+Rendering Update
+
+This consistent interaction pipeline ensures all gameplay systems—breaking blocks, placing blocks, opening containers, using tools, interacting with NPCs, sleeping, or activating mechanisms—share a predictable and maintainable implementation model.
+
+This level of detail gives a coding LLM enough information to implement the player controller, interaction system, and core gameplay loop without having to infer how a Minecraft-like game is supposed to behave.
+

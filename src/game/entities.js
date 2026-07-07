@@ -5,7 +5,6 @@ import { SX, SY, SZ, SCALE, GRASS, DIRT, STONE, SAND, WOOD, LEAVES } from '../co
 import { getTHREE } from '../core/three.js';
 import { getBlock, setBlock } from '../world/world.js';
 import { scene } from '../engine/renderer.js';
-import { rebuildRegion } from '../engine/renderer.js';
 import { solidAt } from '../physics/collision.js';
 import { player, damagePlayer } from './player.js';
 import { playHiss, playExplosion, flashScreen } from '../engine/audio.js';
@@ -130,7 +129,6 @@ function explode(e) {
     for (let y = y0; y <= y1; y++)
       for (let z = z0; z <= z1; z++)
         if (Math.hypot(x - cx, y - cy, z - cz) <= R + 0.5 && getBlock(x, y, z) !== 0) setBlock(x, y, z, 0);
-  rebuildRegion(x0, x1, z0, z1);
   playExplosion();
   flashScreen();
   const d = e.pos.distanceTo(player.pos);
