@@ -112,3 +112,23 @@ export function flashScreen() {
   flashEl.style.opacity = '0.55';
   setTimeout(() => { flashEl.style.opacity = '0'; }, 120);
 }
+
+/** Short percussive "hit" used for melee mob attacks. */
+export function playHit() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const o = audioCtx.createOscillator(); o.type = 'square';
+  o.frequency.setValueAtTime(220, t); o.frequency.exponentialRampToValueAtTime(90, t + 0.12);
+  const g = audioCtx.createGain(); g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+  o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + 0.15);
+}
+
+/** Soft "twang" for a bow/arrow shot. */
+export function playShoot() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const o = audioCtx.createOscillator(); o.type = 'triangle';
+  o.frequency.setValueAtTime(600, t); o.frequency.exponentialRampToValueAtTime(200, t + 0.1);
+  const g = audioCtx.createGain(); g.gain.setValueAtTime(0.18, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+  o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + 0.13);
+}

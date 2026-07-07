@@ -12,7 +12,7 @@ import { initInput } from './engine/input.js';
 import { initTouch, isTouch } from './engine/input/touch.js';
 import { TimeOfDay } from './engine/time.js';
 import { initPlayer, player, move, updateCharacter } from './game/player.js';
-import { spawnEntities, updateEntities } from './game/entities.js';
+import { spawnEntities, updateEntities, entities } from './game/entities.js';
 import { updateDrops } from './game/entities/drops.js';
 import {
   initInteraction, tickInteractions, getSelectedName, getTargetLabel,
@@ -70,7 +70,7 @@ function startLoop(time) {
     if (input.playing) {
       move(dt);
       tickInteractions();
-      updateEntities(dt);
+      updateEntities(dt, time.isNight);
       updateDrops(dt);
     }
     updateCharacter(dt);
@@ -89,8 +89,9 @@ function startLoop(time) {
       fps,
       camX: c.x, camY: c.y, camZ: c.z,
       px: player.pos.x, py: player.pos.y, pz: player.pos.z,
-      chunks: world.chunks.size,
+       chunks: world.chunks.size,
       faces,
+      mobs: entities.length,
       time: formatTime(time.t),
       target: getTargetLabel(),
     });

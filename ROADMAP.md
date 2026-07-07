@@ -71,10 +71,11 @@ unified command layer so desktop/touch/gamepad share gameplay logic.
 - [x] Tool mining speed + durability; block hardness.
 - [x] Item drops + pickup entities.
 
-## Milestone 5 — Entities & AI (PLANNED)
-- [ ] `Entity`/`LivingEntity` base classes; mob hierarchy.
-- [ ] More mobs (zombie, skeleton, spider, slime) with behavior-tree AI.
-- [ ] Spawn manager (light level, caps, biomes).
+## Milestone 5 — Entities & AI (shipped)
+- [x] `Entity`/`LivingEntity` base classes; mob hierarchy (game/entities/entity.js).
+- [x] Behavior-tree AI (game/entities/bt.js) driving creeper, sheep, zombie, skeleton, spider, slime.
+- [x] More mobs with distinct behaviors: zombie (melee), skeleton (ranged arrow), spider (leaper), slime (hopper).
+- [x] Spawn manager (game/entities/spawn.js): per-type caps + day/night gating; mob-drop items.
 
 ## Milestone 6 — World systems (PLANNED)
 - [ ] Biomes (plains, forest, desert, ocean, …) with surface/vegetation/spawn tables.

@@ -86,6 +86,13 @@ try {
   if (!craft(inventory, woodPick)) throw new Error('craft() failed');
   if (countPick() !== pickBefore + 1) throw new Error('craft did not produce a pickaxe');
   console.log('CRAFTING OK');
+
+  // Entities: mobs spawn at boot and the update pipeline runs without error.
+  const { entities, updateEntities } = await import('../src/game/entities.js');
+  if (entities.length === 0) throw new Error('no mobs spawned at boot');
+  updateEntities(0.016, false);
+  updateEntities(0.016, true);
+  console.log(`ENTITIES OK (${entities.length} mobs)`);
 } catch (e) {
   console.error('BOOT FAIL:', e);
   process.exit(1);

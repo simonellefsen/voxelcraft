@@ -9,6 +9,9 @@ import { GRASS, DIRT, STONE, SAND, WOOD, LEAVES, GLASS } from '../../core/config
 // Tool item ids (kept clear of block ids 0..8).
 export const WOOD_PICK = 20, STONE_PICK = 21, WOOD_SWORD = 22, STONE_SWORD = 23;
 
+// Mob-drop item ids (non-placeable).
+export const GUNPOWDER = 30, BONE = 31, ROTTEN_FLESH = 32, STRING = 33, SLIME_BALL = 34;
+
 /** Base seconds to mine a block by hand (speed = 1). */
 const HARDNESS = {
   [GRASS]: 0.4, [DIRT]: 0.4, [STONE]: 1.6, [SAND]: 0.5,
@@ -45,6 +48,12 @@ export const ITEMS = {
     tool: { type: 'sword', material: 'wood', speed: 1, durability: 60, effective: new Set(), damage: 4 } },
   [STONE_SWORD]:{ name: 'Stone Sword', stack: 1, placeBlock: null,
     tool: { type: 'sword', material: 'stone', speed: 1, durability: 130, effective: new Set(), damage: 5 } },
+  // Mob drops (non-placeable)
+  [GUNPOWDER]:   { name: 'Gunpowder', stack: 64, placeBlock: null, tool: null },
+  [BONE]:        { name: 'Bone', stack: 64, placeBlock: null, tool: null },
+  [ROTTEN_FLESH]:{ name: 'Rotten Flesh', stack: 64, placeBlock: null, tool: null },
+  [STRING]:      { name: 'String', stack: 64, placeBlock: null, tool: null },
+  [SLIME_BALL]:  { name: 'Slime Ball', stack: 64, placeBlock: null, tool: null },
 };
 
 export function getItem(id) { return ITEMS[id] || null; }

@@ -44,4 +44,7 @@ export class TimeOfDay {
     const a = (this.t - 0.25) * Math.PI * 2;
     return [Math.cos(a), Math.sin(a), 0.35];
   }
+
+  /** True during the dark half of the cycle (drives hostile spawning). */
+  get isNight() { return this.elevation < -0.05; }
 }

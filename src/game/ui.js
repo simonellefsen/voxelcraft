@@ -91,6 +91,7 @@ export function updateDiagnostics(d) {
     `Cam: (${d.camX.toFixed(1)}, ${d.camY.toFixed(1)}, ${d.camZ.toFixed(1)})\n` +
     `Player: (${d.px.toFixed(1)}, ${d.py.toFixed(1)}, ${d.pz.toFixed(1)})\n` +
     `Chunks: ${d.chunks}\n` +
+    `Mobs: ${d.mobs || 0}\n` +
     `Target: ${d.target || 'none'}`;
 }
 
