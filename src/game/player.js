@@ -6,7 +6,7 @@ import { SX, SY, SZ, SCALE, EYE, SOLID } from '../core/config.js';
 import { getTHREE } from '../core/three.js';
 import { getBlock } from '../world/world.js';
 import { scene, camera } from '../engine/renderer.js';
-import { input, setLook } from '../engine/input.js';
+import { commands, consumeLook } from '../engine/input/commands.js';
 import { solidAt } from '../physics/collision.js';
 import { flashScreen } from '../engine/audio.js';
 
@@ -24,6 +24,9 @@ export let spawnPos = null;
 let swing = 0, walkPhase = 0;
 let character = null;
 let rArm = null;
+let yaw = 0, pitch = 0;   // camera orientation (consumed from commands)
+export function getYaw() { return yaw; }
+export function getPitch() { return pitch; }
 
 /** Player AABB overlaps any solid voxel? */
 function collides() {
@@ -98,12 +101,12 @@ export function triggerSwing() { swing = 1; }
 
 /** Moves the third-person camera behind the player, pulling in near walls. */
 export function updateCameraTransform() {
-  const fx = -Math.sin(input.yaw), fz = -Math.cos(input.yaw);
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
   const headX = player.pos.x * SCALE, headY = (player.pos.y + EYE) * SCALE, headZ = player.pos.z * SCALE;
   const dist = 0.45;
-  let ox = -fx * dist * Math.cos(input.pitch);
-  let oy = 0.2 - Math.sin(input.pitch) * dist;
-  let oz = -fz * dist * Math.cos(input.pitch);
+  let ox = -fx * dist * Math.cos(pitch);
+  let oy = 0.2 - Math.sin(pitch) * dist;
+  let oz = -fz * dist * Math.cos(pitch);
   let len = Math.hypot(ox, oy, oz), tries = 0;
   while (solidAt(headX + ox, headY + oy, headZ + oz) && len > 0.12 && tries < 12) {
     ox *= 0.7; oy *= 0.7; oz *= 0.7; len *= 0.7; tries++;
@@ -114,7 +117,7 @@ export function updateCameraTransform() {
 
 export function updateCharacter(dt) {
   character.position.set(player.pos.x * SCALE, player.pos.y * SCALE, player.pos.z * SCALE);
-  character.rotation.y = input.yaw;
+  character.rotation.y = yaw;
   const moving = (Math.abs(player.vel.x) + Math.abs(player.vel.z)) > 0.1;
   if (moving) walkPhase += dt * 10; else walkPhase *= 0.9;
   if (swing > 0) swing = Math.max(0, swing - dt * 3);
@@ -124,20 +127,24 @@ export function updateCharacter(dt) {
 
 /** Advances player physics by dt seconds. */
 export function move(dt) {
-  if (input.keys['KeyA']) input.yaw += TURN * dt;
-  if (input.keys['KeyD']) input.yaw -= TURN * dt;
-  setLook();
+  // Apply look (mouse/touch swipe + A/D turn) to camera orientation.
+  const [dx, dy] = consumeLook();
+  yaw += dx + commands.turn * TURN * dt;
+  pitch = Math.max(-1.55, Math.min(1.55, pitch + dy));
+  camera.current.rotation.set(pitch, yaw, 0);
 
-  const fx = -Math.sin(input.yaw), fz = -Math.cos(input.yaw);
+  // Movement relative to yaw (forward + strafe).
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  const rx = Math.cos(yaw), rz = -Math.sin(yaw);
   const dir = new (getTHREE().Vector3)();
-  if (input.keys['KeyW']) { dir.x += fx; dir.z += fz; }
-  if (input.keys['KeyS']) { dir.x -= fx; dir.z -= fz; }
+  dir.x += fx * commands.moveZ + rx * commands.moveX;
+  dir.z += fz * commands.moveZ + rz * commands.moveX;
   if (dir.lengthSq() > 0) dir.normalize();
-  const spd = (input.keys['ShiftLeft'] || input.keys['ShiftRight']) ? SPRINT : SPEED;
+  const spd = commands.sprint ? SPRINT : SPEED;
   player.vel.x = dir.x * spd; player.vel.z = dir.z * spd;
 
   player.vel.y += GRAVITY * dt;
-  if (input.keys['Space'] && player.onGround) { player.vel.y = JUMP; player.onGround = false; }
+  if (commands.jump && player.onGround) { player.vel.y = JUMP; player.onGround = false; }
 
   const p = player.pos;
   player.onGround = false;

@@ -8,6 +8,7 @@ import { getBlock, setBlock } from '../world/world.js';
 import { allMeshes, highlight } from '../engine/renderer.js';
 import { camera } from '../engine/renderer.js';
 import { input } from '../engine/input.js';
+import { commands, consumeActions, consumeSelect } from '../engine/input/commands.js';
 import { player, triggerSwing } from './player.js';
 import { playMine, playPlace } from '../engine/audio.js';
 import { showMenu, showError } from './ui.js';
@@ -16,6 +17,7 @@ let selected = 0;
 let target = null;
 let raycaster = null; // created in initInteraction (needs THREE)
 let center = null;
+let cursorNDC = null;  // desktop free-look aim (from commands.cursorX/Y)
 let downTime = 0;
 
 const hotbar = document.getElementById('hotbar');
@@ -23,7 +25,9 @@ const hotbar = document.getElementById('hotbar');
 /** Recomputes the targeted block (break + place cells) from the camera. */
 export function updateTarget() {
   const THREE = getTHREE();
-  raycaster.setFromCamera(input.locked ? center : input.mouseNDC, camera.current);
+  const ndc = commands.aimCenter ? center : cursorNDC;
+  if (!commands.aimCenter) { cursorNDC.x = commands.cursorX; cursorNDC.y = commands.cursorY; }
+  raycaster.setFromCamera(ndc, camera.current);
   raycaster.ray.origin.set(player.pos.x * SCALE, (player.pos.y + EYE) * SCALE, player.pos.z * SCALE);
   const hits = raycaster.intersectObjects(allMeshes, false);
   if (hits.length && hits[0].distance < 8) {
@@ -91,11 +95,12 @@ export function placeBlock() {
   } catch (err) { showError('place error: ' + (err && err.message)); console.error(err); }
 }
 
-/** Wires keyboard + mouse listeners. Call once after renderer/init. */
+/** Wires input listeners. Call once after renderer/init. */
 export function initInteraction() {
   const THREE = getTHREE();
   raycaster = new THREE.Raycaster();
   center = new THREE.Vector2(0, 0);
+  cursorNDC = new THREE.Vector2(0, 0);
 
   HOTBAR_BLOCKS.forEach((b, i) => {
     const s = document.createElement('div');
@@ -108,28 +113,37 @@ export function initInteraction() {
   selectSlot(0);
 
   addEventListener('keydown', e => {
-    input.keys[e.code] = true;
     if (e.code === 'Escape') showMenu();
-    if (e.key >= '1' && e.key <= '7') selectSlot(+e.key - 1);
-    if (input.playing) {
-      if (e.code === 'KeyE') { if (target) breakBlock(); }
-      if (e.code === 'KeyF') { if (target) placeBlock(); }
-    }
+    if (e.key >= '1' && e.key <= '7') commands.selectSlot = +e.key - 1;
+    if (e.code === 'KeyE') commands.break = true;
+    if (e.code === 'KeyF') commands.place = true;
   });
 
   addEventListener('mousedown', e => {
     if (e.target && e.target.closest && e.target.closest('#hotbar, #overlay')) return;
-    if (!input.playing || !target) return;
-    if (e.button === 0) { input.mouseDown = true; input.moved = 0; downTime = performance.now(); }
-    else if (e.button === 2) { placeBlock(); }
+    if (!input.playing) return;
+    if (e.button === 0) { input.mouseDown = true; commands.break = true; }
+    else if (e.button === 2) { commands.place = true; }
   });
-  addEventListener('mouseup', e => {
-    if (e.button === 0 && input.mouseDown) {
-      input.mouseDown = false;
-      if (performance.now() - downTime < 250 && target) breakBlock();
-    }
-  });
+  addEventListener('mouseup', e => { if (e.button === 0) input.mouseDown = false; });
   addEventListener('contextmenu', e => {
     if (!e.target.closest || !e.target.closest('#hotbar, #overlay')) e.preventDefault();
   });
+}
+
+/**
+ * Per-frame interaction tick: updates the target and consumes pending actions
+ * (break/place/select) issued through the unified command layer.
+ */
+export function tickInteractions() {
+  updateTarget();
+  const a = consumeActions();
+  if (input.playing) {
+    if (a.break) breakBlock();
+    if (a.place) placeBlock();
+    if (a.interact) { /* TODO: contextual interact (chests, beds, NPCs) */ }
+    if (a.openInventory) { /* TODO: open inventory UI */ }
+  }
+  const s = consumeSelect();
+  if (s >= 0) selectSlot(s);
 }

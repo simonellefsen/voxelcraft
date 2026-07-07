@@ -1,20 +1,19 @@
 // engine/input.js
-// Keyboard state, mouse-look, and pointer-lock (with drag-to-look fallback).
-// Exposes a single mutable `input` state object shared across modules.
+// Low-level keyboard/mouse source. Writes high-level intent into `commands`
+// (see commands.js). Owns pointer-lock state, the drag-to-look fallback, and
+// the crosshair position. It does NOT apply look/movement — the player does,
+// by consuming commands.
 
 import { getTHREE } from '../core/three.js';
 import { camera, renderer } from './renderer.js';
+import { commands } from './input/commands.js';
 
-/** Shared input state. Mutate fields directly; reads are live across modules. */
+/** Shared play/lock state still read by UI + drag-look. */
 export const input = {
-  keys: {},
-  yaw: 0,
-  pitch: 0,
-  locked: false,
   playing: false,
+  locked: false,
   mouseDown: false,
   moved: 0,
-  mouseNDC: null,     // THREE.Vector2 for the off-center crosshair
   mouseX: 0,
   mouseY: 0,
 };
@@ -32,11 +31,6 @@ export function positionCrosshair() {
   }
 }
 
-/** Applies yaw/pitch to the camera. */
-export function setLook() {
-  camera.current.rotation.set(input.pitch, input.yaw, 0);
-}
-
 /** Requests pointer lock on the canvas (best-effort; drag-look is the fallback). */
 export function requestLock() {
   const el = renderer.current.domElement;
@@ -44,15 +38,23 @@ export function requestLock() {
   if (p && p.catch) p.catch(() => {});
 }
 
-/** Wires mouse-look + pointer-lock listeners. Call once after renderer init. */
+const kb = new Set();
+function applyKeys() {
+  commands.moveZ = (kb.has('KeyW') ? 1 : 0) - (kb.has('KeyS') ? 1 : 0);
+  commands.moveX = 0;                       // desktop strafes via turn (A/D)
+  commands.turn = (kb.has('KeyD') ? 1 : 0) - (kb.has('KeyA') ? 1 : 0);
+  commands.jump = kb.has('Space');
+  commands.sprint = kb.has('ShiftLeft') || kb.has('ShiftRight');
+}
+
+/** Wires keyboard + mouse-look + pointer-lock. Call once after renderer init. */
 export function initInput() {
-  const THREE = getTHREE();
-  input.mouseNDC = new THREE.Vector2(0, 0);
   input.mouseX = innerWidth / 2;
   input.mouseY = innerHeight / 2;
 
   document.addEventListener('pointerlockchange', () => {
     input.locked = (document.pointerLockElement === renderer.current.domElement);
+    commands.aimCenter = input.locked;
     document.body.style.cursor = input.locked ? 'none' : 'default';
     positionCrosshair();
   });
@@ -62,19 +64,18 @@ export function initInput() {
     if (!input.playing) return;
     if (!input.locked) {
       input.mouseX = e.clientX; input.mouseY = e.clientY;
-      input.mouseNDC.x = (e.clientX / innerWidth) * 2 - 1;
-      input.mouseNDC.y = -(e.clientY / innerHeight) * 2 + 1;
+      commands.cursorX = (e.clientX / innerWidth) * 2 - 1;
+      commands.cursorY = -(e.clientY / innerHeight) * 2 + 1;
+      commands.aimCenter = false;
       positionCrosshair();
     }
-    // Turn with the mouse either when pointer-locked, or by holding left button (drag-look)
     if (input.locked || input.mouseDown) {
-      input.yaw -= e.movementX * 0.0022;
-      input.pitch -= e.movementY * 0.0022;
-      input.pitch = Math.max(-1.55, Math.min(1.55, input.pitch));
-      setLook();
+      commands.lookDX -= e.movementX * 0.0022;
+      commands.lookDY -= e.movementY * 0.0022;
     }
     if (input.mouseDown) input.moved += Math.abs(e.movementX) + Math.abs(e.movementY);
   });
 
-  addEventListener('keyup', e => { input.keys[e.code] = false; });
+  addEventListener('keydown', e => { kb.add(e.code); applyKeys(); });
+  addEventListener('keyup', e => { kb.delete(e.code); applyKeys(); });
 }

@@ -9,16 +9,17 @@ import { world } from './world/world.js';
 import { initRenderer, camera, renderer, scene, sync, applyTime, allMeshes } from './engine/renderer.js';
 import { initMaterials } from './engine/materials.js';
 import { initInput } from './engine/input.js';
+import { initTouch, isTouch } from './engine/input/touch.js';
 import { TimeOfDay } from './engine/time.js';
 import { initPlayer, player, move, updateCharacter } from './game/player.js';
 import { spawnEntities, updateEntities } from './game/entities.js';
 import {
-  initInteraction, updateTarget, getSelectedName, getTargetLabel,
+  initInteraction, tickInteractions, getSelectedName, getTargetLabel,
 } from './game/interaction.js';
 import { initUI, showError, updateHud, updateDiagnostics } from './game/ui.js';
 import { input } from './engine/input.js';
 
-const RENDER_DIST = 16; // chunks — exceeds fog distance so the world looks full
+const RENDER_DIST = isTouch() ? 8 : 16; // chunks — exceeds fog; tighter on mobile
 
 window.addEventListener('error', e => showError(e.message || e.error || e));
 window.addEventListener('unhandledrejection', e => showError((e.reason && e.reason.message) || e.reason));
@@ -36,6 +37,7 @@ window.addEventListener('unhandledrejection', e => showError((e.reason && e.reas
 
     initRenderer();
     initInput();
+    initTouch();
     initPlayer();
     initInteraction();
     initUI();
@@ -66,7 +68,7 @@ function startLoop(time) {
 
     if (input.playing) {
       move(dt);
-      updateTarget();
+      tickInteractions();
       updateEntities(dt);
     }
     updateCharacter(dt);
