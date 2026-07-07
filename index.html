@@ -525,13 +525,13 @@ function triggerSwing() { swing = 1; }
 function updateCameraTransform() {
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
   const headX = player.pos.x * SCALE, headY = (player.pos.y + EYE) * SCALE, headZ = player.pos.z * SCALE;
-  const dist = 0.6;
+  const dist = 0.45;
   let ox = -fx * dist * Math.cos(pitch);
-  let oy = 0.35 - Math.sin(pitch) * dist;
+  let oy = 0.2 - Math.sin(pitch) * dist;
   let oz = -fz * dist * Math.cos(pitch);
-  // Pull the camera in if it would end up inside a block (third-person)
+  // Pull the camera in if it would end up inside a block (third-person), but keep a minimum distance
   let len = Math.hypot(ox, oy, oz), tries = 0;
-  while (solidAt(headX + ox, headY + oy, headZ + oz) && len > 0.05 && tries < 12) {
+  while (solidAt(headX + ox, headY + oy, headZ + oz) && len > 0.12 && tries < 12) {
     ox *= 0.7; oy *= 0.7; oz *= 0.7; len *= 0.7; tries++;
   }
   camera.position.set(headX + ox, headY + oy, headZ + oz);
@@ -759,6 +759,8 @@ let target = null;
 
 function updateTarget() {
   raycaster.setFromCamera(locked ? center : mouseNDC, camera);
+  // Start the ray at the player's eye so it never originates inside terrain behind the camera
+  raycaster.ray.origin.set(player.pos.x * SCALE, (player.pos.y + EYE) * SCALE, player.pos.z * SCALE);
   const hits = raycaster.intersectObjects(allMeshes, false);
   if (hits.length && hits[0].distance < 8) {
     const h = hits[0];
@@ -819,7 +821,7 @@ renderer.domElement.addEventListener('mousedown', e => {
 addEventListener('mouseup', e => {
   if (e.button === 0 && mouseDown) {
     mouseDown = false;
-    if (moved < 8 && target) breakBlock(); // a click, not a look-drag
+    if (moved < 16 && target) breakBlock(); // a click, not a look-drag
   }
 });
 renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
