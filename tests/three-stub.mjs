@@ -63,11 +63,11 @@ export class Mesh {
   constructor(geometry) {
     this.geometry = geometry || new Geom();
     this.position = new V3(); this.rotation = { x: 0, y: 0, z: 0 }; this.scale = { setScalar() {} };
-    this.visible = true; this.material = null;
+    this.visible = true; this.material = null; this.userData = {};
   }
   lookAt() {}
 }
 export class LineSegments { constructor() { this.position = new V3(); this.visible = true; } }
-export class Group { constructor() { this.children = []; this.position = new V3(); this.rotation = { x: 0, y: 0, z: 0 }; this.scale = { setScalar() {} }; this.visible = true; } add(...o) { this.children.push(...o); } lookAt() {} }
+export class Group { constructor() { this.children = []; this.position = new V3(); this.rotation = { x: 0, y: 0, z: 0 }; this.scale = { setScalar() {} }; this.visible = true; this.userData = {}; } add(...o) { this.children.push(...o); } lookAt() {} }
 export class CanvasTexture { constructor() {} }
 export class Clock { getDelta() { return 0.016; } }

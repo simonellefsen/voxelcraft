@@ -8,6 +8,7 @@ function fakeEl() {
     setAttribute() {}, focus() {}, classList: { toggle() {}, add() {}, remove() {} },
     set textContent(v) {}, get textContent() { return ''; },
     set innerHTML(v) {}, closest() { return null; },
+    querySelectorAll: () => [], querySelector: () => fakeEl(),
   };
 }
 function makeCanvas() {

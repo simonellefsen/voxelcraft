@@ -45,6 +45,7 @@ export class Entity {
     this.w = 0.25;
     this.h = 1.0;
     this.heading = Math.random() * Math.PI * 2;
+    model.userData.entity = this; // lets raycasts map a hit mesh back to its entity
     scene.current.add(model);
   }
 

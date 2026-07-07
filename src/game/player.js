@@ -10,6 +10,7 @@ import { commands, consumeLook } from '../engine/input/commands.js';
 import { solidAt } from '../physics/collision.js';
 import { flashScreen } from '../engine/audio.js';
 import { WOOD_PICK, STONE_PICK, WOOD_SWORD, STONE_SWORD } from '../world/items/items.js';
+import { getDifficulty } from './difficulty.js';
 
 const GRAVITY = -28, JUMP = 9, SPEED = 5, SPRINT = 8;
 const TURN = 2.4; // radians/sec for A/D
@@ -296,8 +297,11 @@ export function move(dt) {
   updateCameraTransform();
 }
 
-/** Applies fall/explosion damage; respawns at spawn on death. */
+/** Applies fall/explosion damage; respawns at spawn on death. Amount is
+ * scaled by the current difficulty's damage multiplier. */
 export function damagePlayer(amt) {
+  if (amt <= 0) return;
+  amt *= getDifficulty().dmgMul;
   if (amt <= 0) return;
   player.health -= amt;
   flashScreen();

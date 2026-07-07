@@ -11,6 +11,7 @@ import {
 } from '../engine/audio.js';
 import { inventory } from './inventory/playerInventory.js';
 import { ITEMS } from '../world/items/items.js';
+import { setDifficulty, getDifficultyKey } from './difficulty.js';
 import { RECIPES, canCraft, craft, recipeSummary } from '../world/items/recipes.js';
 
 const overlay = document.getElementById('overlay');
@@ -62,6 +63,19 @@ export function initUI() {
     if (isMusicOn()) startMusic(); else stopMusic();
   });
   updateMusicLabel();
+
+  // Difficulty selector on the start overlay (must not start the game).
+  const diffWrap = document.getElementById('difficulty');
+  if (diffWrap) {
+    const btns = [...diffWrap.querySelectorAll('.diffbtn')];
+    const syncDiff = () => btns.forEach(b => b.classList.toggle('active', b.dataset.d === getDifficultyKey()));
+    btns.forEach(b => b.addEventListener('click', e => {
+      e.stopPropagation();
+      setDifficulty(b.dataset.d);
+      syncDiff();
+    }));
+    syncDiff();
+  }
 
   // Crafting menu: I toggles, Esc closes (when open). These are handled here
   // so the in-game pause (overlay) and the crafting sub-menu don't conflict.

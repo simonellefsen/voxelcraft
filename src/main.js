@@ -20,6 +20,7 @@ import {
   initInteraction, tickInteractions, getSelectedName, getTargetLabel,
 } from './game/interaction.js';
 import { initUI, showError, updateHud, updateDiagnostics } from './game/ui.js';
+import { getDifficultyKey } from './game/difficulty.js';
 import { input } from './engine/input.js';
 
 const RENDER_DIST = isTouch() ? 8 : 16; // chunks — exceeds fog; tighter on mobile
@@ -46,7 +47,7 @@ window.addEventListener('unhandledrejection', e => showError((e.reason && e.reas
     initPlayer();
     initInteraction();
     initUI();
-    spawnEntities();
+    spawnEntities(false); // boot starts mid-morning; hostiles only appear at night
 
     // Manual save (O) — persists all loaded chunks to IndexedDB.
     window.addEventListener('keydown', async (e) => {
@@ -94,6 +95,7 @@ function startLoop(time) {
     updateHud(
       `HP: ${Math.max(0, Math.round(player.health))}  •  ` +
       `XYZ: ${player.pos.x.toFixed(1)} / ${player.pos.y.toFixed(1)} / ${player.pos.z.toFixed(1)}  •  ` +
+      `Diff: ${getDifficultyKey()}  •  ` +
       getSelectedName()
     );
 

@@ -16,6 +16,8 @@ import { showError, toggleCraft } from './ui.js';
 import { inventory, HOTBAR } from './inventory/playerInventory.js';
 import { ITEMS, isTool, placeBlockOf, miningTime } from '../world/items/items.js';
 import { spawnDrop } from './entities/drops.js';
+import { entities } from './entities.js';
+import { playHit } from '../engine/audio.js';
 
 let selected = 0;
 let target = null;
@@ -105,6 +107,33 @@ function finalizeBreak(b) {
   triggerSwing();
 }
 
+let attackCd = 0;
+
+/** Left-click attack on a mob under the crosshair. Returns true if a mob was
+ * hit this frame (so block mining is suppressed). */
+function tryAttack(dt) {
+  attackCd = Math.max(0, attackCd - dt);
+  if (!commands.break || !input.playing) return false;
+  if (attackCd > 0) return false;
+  const models = [];
+  for (const e of entities) if (e.alive && !e.dead && e.model && e.takeDamage) models.push(e.model);
+  if (!models.length) return false;
+  const hits = raycaster.intersectObjects(models, true);
+  if (!hits.length || hits[0].distance >= 0.4) return false; // ~6 blocks (voxel-scaled)
+  let o = hits[0].object, ent = null;
+  while (o) { if (o.userData && o.userData.entity) { ent = o.userData.entity; break; } o = o.parent; }
+  if (!ent || !ent.takeDamage) return false;
+  const slot = inventory.get(selected);
+  const itemId = slot && slot.id ? slot.id : 0;
+  const dmg = (ITEMS[itemId] && ITEMS[itemId].tool) ? ITEMS[itemId].tool.damage : 1;
+  ent.takeDamage(dmg);
+  attackCd = 0.4;
+  triggerSwing();
+  playHit();
+  if (slot && ITEMS[itemId] && ITEMS[itemId].tool) inventory.damageSlot(selected);
+  return true;
+}
+
 /** Tool-aware mining progress while the break command is held. */
 function updateMining(dt) {
   if (!commands.break || !input.playing || !target) { breaking = null; return; }
@@ -137,7 +166,7 @@ export function placeBlock() {
 export function tickInteractions(dt) {
   updateTarget();
   if (input.playing) {
-    updateMining(dt);
+    if (!tryAttack(dt)) updateMining(dt);
     const a = consumeActions();
     if (a.place) placeBlock();
     if (a.interact) { /* TODO: contextual interact */ }
@@ -165,7 +194,7 @@ export function initInteraction() {
     hotbarEls.push(s);
   }
   renderHotbarUI();
-  selectSlot(0);
+  selectSlot(8); // start holding the wooden sword so the player can defend
 
   addEventListener('keydown', e => {
     if (e.key >= '1' && e.key <= '9') commands.selectSlot = +e.key - 1;

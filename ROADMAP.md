@@ -84,6 +84,20 @@ unified command layer so desktop/touch/gamepad share gameplay logic.
 - [x] Save system (`world/save/save.js`): binary RLE chunk serialization + IndexedDB persistence (feature-detected), restored on boot.
 - [x] Boot-test assertions: biomes vary, torch emits light, save round-trips.
 
+## Difficulty & fair start (shipped)
+Per user feedback: the game must not ambush a fresh spawn and the player needs a
+way to defend. Added selectable difficulty + a starting kit + player melee.
+- [x] `game/difficulty.js`: Peaceful / Easy / Normal / Hard (hostile spawn, cap
+      multiplier, spawn radius, mob-damage multiplier, grace period, start kit).
+- [x] Difficulty selector on the start overlay (`index.html` + `ui.js`); defaults to Easy.
+- [x] `spawn.js` now respects day/night at boot (`fill` skips hostiles in daylight)
+      and a per-difficulty grace window + min spawn radius so the player isn't swarmed.
+- [x] `player.damagePlayer` scales mob damage by the difficulty multiplier (Peaceful = 0).
+- [x] Starting kit seeds a wooden sword (and pick) and the player begins holding the sword.
+- [x] Player can now melee mobs: left-click raycasts mobs and applies the held tool's
+      damage (`interaction.tryAttack`); mob models tagged for raycast targeting.
+- [x] HUD shows current difficulty.
+
 ## Camera modes — first / third person (shipped)
 Per DESIGN.md "Camera Modes and Player Visibility": first-person is the default;
 the player body is never drawn in first-person — only the held hotbar item is.

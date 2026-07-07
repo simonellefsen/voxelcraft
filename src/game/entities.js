@@ -12,8 +12,8 @@ import { player } from './player.js';
 const manager = new SpawnManager();
 
 /** Seeds the initial mob population around the player. */
-export function spawnEntities() {
-  manager.fill(player.pos.x, player.pos.z);
+export function spawnEntities(isNight = false) {
+  manager.fill(player.pos.x, player.pos.z, isNight);
 }
 
 /**
