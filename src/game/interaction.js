@@ -10,7 +10,7 @@ import { allMeshes, highlight } from '../engine/renderer.js';
 import { camera } from '../engine/renderer.js';
 import { input } from '../engine/input.js';
 import { commands, consumeActions, consumeSelect } from '../engine/input/commands.js';
-import { player, triggerSwing } from './player.js';
+import { player, triggerSwing, setHeldItem } from './player.js';
 import { playMine, playPlace } from '../engine/audio.js';
 import { showError, toggleCraft } from './ui.js';
 import { inventory, HOTBAR } from './inventory/playerInventory.js';
@@ -91,6 +91,7 @@ function renderHotbarUI() {
     }
     el.classList.toggle('active', i === selected);
   }
+  setHeldItem(inventory.get(selected) ? inventory.get(selected).id : 0);
 }
 
 function finalizeBreak(b) {

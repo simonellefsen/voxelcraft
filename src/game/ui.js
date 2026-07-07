@@ -3,6 +3,7 @@
 // textual diagnostics overlay (the LLM's "eyes" — see DESIGN.md).
 
 import { input, requestLock, positionCrosshair } from '../engine/input.js';
+import { toggleCameraMode, getCameraMode } from '../game/player.js';
 import { commands } from '../engine/input/commands.js';
 import { highlight } from '../engine/renderer.js';
 import {
@@ -67,6 +68,7 @@ export function initUI() {
   addEventListener('keydown', e => {
     if (craftOpen && e.code === 'Escape') { e.preventDefault(); hideCraftMenu(); return; }
     if (e.code === 'KeyI' && input.playing && !craftOpen) { e.preventDefault(); commands.openInventory = true; }
+    if (e.code === 'KeyV' && input.playing) { e.preventDefault(); toggleCameraMode(); }
   });
 
   // Diagnostics overlay (textual vision for non-vision tooling)

@@ -1775,3 +1775,252 @@ Unified Player Commands
 The rest of the game should only consume these high-level commands, making it easy to support desktop, mobile, and game controllers without changing gameplay logic.
 
 Overall, a browser-based Minecraft-like game can absolutely run meaningfully on iPhone Safari or Chrome, but it should feel like a touch-native voxel game rather than a desktop game squeezed onto a phone. Designing the input and UI around touch from the outset will produce a much better experience than trying to emulate keyboard-and-mouse controls.
+
+--
+
+I actually think this is one of the most important things to explain to the coding LLM. Since it can't "see" the screenshot, you want to describe **why the current implementation feels wrong** and **what the expected player experience should be**.
+
+I'd add something like this to your design document:
+
+---
+
+# Camera Modes and Player Visibility
+
+The game supports both first-person and third-person camera modes.
+
+## First-Person Mode (Default)
+
+First-person is the primary gameplay mode.
+
+The player's body is **not rendered** (or only the held item/tool is rendered).
+
+The player sees:
+
+* World
+* Crosshair
+* Held tool or block
+* HUD
+* Hotbar
+
+The player should **never see their own torso, head, or legs** in normal gameplay.
+
+Reason:
+
+Building, mining, placing blocks, and interacting with the world require an unobstructed view.
+
+Example:
+
+The player looks directly at a dirt block.
+
+The center crosshair is positioned on the block.
+
+Only the currently equipped pickaxe or block appears in the lower-right portion of the screen.
+
+Nothing blocks the center of the screen.
+
+This is the preferred mode for:
+
+* Mining
+* Building
+* Combat
+* Exploring caves
+* Opening containers
+* Crafting
+
+---
+
+## Third-Person Mode
+
+Third-person is optional.
+
+It is intended for:
+
+* Watching the character
+* Taking screenshots
+* Multiplayer
+* Navigation
+* Admiring skins
+
+The camera is positioned approximately:
+
+* 3–5 blocks behind the player
+* 1–2 blocks above the player
+
+The player model is fully visible.
+
+The camera automatically moves closer if an obstacle blocks the view.
+
+The player may switch between:
+
+* First-person
+* Third-person behind
+* Third-person front (optional)
+
+---
+
+# Current Issue
+
+The current implementation places the camera behind the player by default.
+
+This causes the player's body to occupy approximately 20–30% of the screen.
+
+The body blocks the crosshair area while:
+
+* Breaking blocks
+* Placing blocks
+* Looking downward
+* Building walls
+* Mining
+
+This makes precise interaction difficult.
+
+This is **not** the desired default gameplay experience.
+
+---
+
+# Desired Camera Behavior
+
+Default camera:
+
+```text
+Camera (eye position)
+      |
+      V
++----------------------+
+|                      |
+|        Crosshair     |
+|                      |
+|                      |
+|                      |
+|    Pickaxe only      |
++----------------------+
+```
+
+The player should not see:
+
+* Head
+* Shoulders
+* Torso
+* Legs
+
+Only the held tool should be visible.
+
+---
+
+# Held Item Rendering
+
+Instead of rendering the entire player model, render only the equipped item.
+
+Examples:
+
+Holding nothing
+
+Nothing appears.
+
+Holding a pickaxe
+
+The pickaxe appears in the lower-right corner.
+
+Holding a torch
+
+The torch appears in the lower-right corner.
+
+Holding dirt
+
+A dirt block appears in the lower-right corner.
+
+The held item:
+
+* Is not part of the world
+* Is rendered in screen space
+* Uses a slightly different field of view
+* Does not collide with the environment
+* Has simple swing animations
+
+---
+
+# Breaking Blocks
+
+The player aims using a fixed crosshair at the center of the screen.
+
+Interaction sequence:
+
+Player rotates camera
+
+↓
+
+Crosshair points at a block
+
+↓
+
+Raycast identifies the block
+
+↓
+
+Block outline is displayed
+
+↓
+
+Player holds Break
+
+↓
+
+Mining progress increases
+
+↓
+
+Block breaks
+
+↓
+
+Item drops
+
+↓
+
+Held tool plays a swing animation
+
+The player's body should never obscure the targeted block.
+
+---
+
+# Placing Blocks
+
+The player selects a block from the hotbar.
+
+The raycast determines which face of the targeted block is selected.
+
+A placement preview may optionally be shown.
+
+When Place is pressed:
+
+* The adjacent empty voxel is filled.
+* The new block appears immediately.
+* The chunk mesh updates.
+* A placement sound plays.
+
+Again, only the held block/tool animates—the player's body remains hidden in first-person.
+
+---
+
+# Mobile Considerations
+
+On mobile, first-person is even more important because the screen is smaller.
+
+Any body geometry in the center of the screen significantly reduces precision.
+
+Therefore:
+
+* First-person should be the default.
+* Third-person should be available as a toggle.
+* All building and mining interactions should be optimized for first-person.
+
+---
+
+### Looking at your screenshot specifically
+
+From your screenshot, I'd tell the coding LLM:
+
+> The player camera is currently positioned behind the player model, creating a third-person view. This is incorrect for the default gameplay. The player's torso occupies the center of the screen and obstructs interaction with the world. Change the default to a first-person camera positioned at the player's eye height (approximately 1.62 blocks above the feet). Do not render the player body in first-person. Instead, render only the currently equipped item (pickaxe, axe, block, torch, etc.) in the lower-right corner with a simple swing animation. Keep the third-person camera as an optional mode that can be toggled for exploration or viewing the character.
+
+I think this single change would make your prototype immediately feel much closer to Minecraft and much more comfortable for building and mining.
+

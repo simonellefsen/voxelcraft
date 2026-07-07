@@ -84,6 +84,16 @@ unified command layer so desktop/touch/gamepad share gameplay logic.
 - [x] Save system (`world/save/save.js`): binary RLE chunk serialization + IndexedDB persistence (feature-detected), restored on boot.
 - [x] Boot-test assertions: biomes vary, torch emits light, save round-trips.
 
+## Camera modes — first / third person (shipped)
+Per DESIGN.md "Camera Modes and Player Visibility": first-person is the default;
+the player body is never drawn in first-person — only the held hotbar item is.
+- [x] First-person is the default camera mode (`cameraMode = 'first'` in `game/player.js`).
+- [x] First-person hides the character; a view-model arm + the selected hotbar item is parented to the camera.
+- [x] Held view-model reflects the selected slot: pickaxe/sword tools, torch, and placeable blocks (swatch-colored cube). Empty/air selection shows nothing.
+- [x] Third-person orbit camera ~4 blocks behind / 1.4 up, auto-pulls in near walls (screenshots/navigation).
+- [x] Toggle via `V` (desktop) and a `Cam` touch button + 3-finger swipe-down (mobile).
+- [x] Commit & push.
+
 ## Conventions
 - One responsibility per file; ≤400 lines (prefer 150–250).
 - Public APIs documented with JSDoc.

@@ -8,6 +8,7 @@
 // See DESIGN.md "MOBILE".
 
 import { commands } from './commands.js';
+import { toggleCameraMode } from '../../game/player.js';
 
 /** True on touch-capable devices. */
 export function isTouch() {
@@ -23,6 +24,7 @@ export function initTouch() {
   buildJoystick();
   buildLookLayer();
   buildButtons();
+  buildCameraGesture();
   return true;
 }
 
@@ -134,4 +136,21 @@ function buildButtons() {
   mk('Place', W - 170, innerHeight - 190, () => commands.place = true);
   mk('Use', W - 250, innerHeight - 190, () => commands.interact = true);
   mk('Craft', W - 250, innerHeight - 110, () => commands.openInventory = true);
+  mk('Cam', W - 330, innerHeight - 110, () => toggleCameraMode());
+}
+
+/** Three-finger swipe-down toggles first/third-person (DESIGN: "swipe down
+ * with 3 fingers"). Attached at the document level so it works anywhere. */
+function buildCameraGesture() {
+  let active = false, startY = 0;
+  addEventListener('touchstart', e => {
+    if (e.touches.length === 3) { active = true; startY = e.touches[0].clientY; }
+  }, { passive: true });
+  addEventListener('touchmove', e => {
+    if (active && e.touches.length === 3) {
+      const dy = e.touches[0].clientY - startY;
+      if (dy > 60) { active = false; toggleCameraMode(); }
+    }
+  }, { passive: true });
+  addEventListener('touchend', e => { if (e.touches.length < 3) active = false; }, { passive: true });
 }

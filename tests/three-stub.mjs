@@ -30,7 +30,8 @@ export class Scene {
 }
 export class Fog { constructor() { this.color = { setRGB() {}, set() {} }; } }
 export class PerspectiveCamera {
-  constructor() { this.rotation = { order: 'XYZ', set() {} }; this.position = new V3(); this.aspect = 1; }
+  constructor() { this.rotation = { order: 'XYZ', set() {} }; this.position = new V3(); this.aspect = 1; this.children = []; }
+  add(...o) { this.children.push(...o); }
   updateProjectionMatrix() {}
   lookAt() {}
 }
@@ -62,10 +63,11 @@ export class Mesh {
   constructor(geometry) {
     this.geometry = geometry || new Geom();
     this.position = new V3(); this.rotation = { x: 0, y: 0, z: 0 }; this.scale = { setScalar() {} };
-    this.material = null;
+    this.visible = true; this.material = null;
   }
+  lookAt() {}
 }
 export class LineSegments { constructor() { this.position = new V3(); this.visible = true; } }
-export class Group { constructor() { this.children = []; this.position = new V3(); this.rotation = { x: 0, y: 0, z: 0 }; this.scale = { setScalar() {} }; } add(...o) { this.children.push(...o); } }
+export class Group { constructor() { this.children = []; this.position = new V3(); this.rotation = { x: 0, y: 0, z: 0 }; this.scale = { setScalar() {} }; this.visible = true; } add(...o) { this.children.push(...o); } lookAt() {} }
 export class CanvasTexture { constructor() {} }
 export class Clock { getDelta() { return 0.016; } }

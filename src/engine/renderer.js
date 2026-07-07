@@ -44,6 +44,7 @@ export function initRenderer() {
   scene.current = sc;
   camera.current = cam;
   renderer.current = rnd;
+  sc.add(cam); // so camera-attached view-models (first-person arm) render
 
   const h = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.BoxGeometry(SCALE * 1.002, SCALE * 1.002, SCALE * 1.002)),

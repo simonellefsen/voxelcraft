@@ -2,13 +2,14 @@
 // Player state, third-person blocky avatar (with pickaxe), movement,
 // collision, and the third-person camera rig.
 
-import { SX, SY, SZ, SCALE, EYE, SOLID } from '../core/config.js';
+import { SX, SY, SZ, SCALE, EYE, SOLID, AIR, BLOCK_SWATCH, TORCH } from '../core/config.js';
 import { getTHREE } from '../core/three.js';
 import { getBlock } from '../world/world.js';
 import { scene, camera } from '../engine/renderer.js';
 import { commands, consumeLook } from '../engine/input/commands.js';
 import { solidAt } from '../physics/collision.js';
 import { flashScreen } from '../engine/audio.js';
+import { WOOD_PICK, STONE_PICK, WOOD_SWORD, STONE_SWORD } from '../world/items/items.js';
 
 const GRAVITY = -28, JUMP = 9, SPEED = 5, SPRINT = 8;
 const TURN = 2.4; // radians/sec for A/D
@@ -24,9 +25,27 @@ export let spawnPos = null;
 let swing = 0, walkPhase = 0;
 let character = null;
 let rArm = null;
+let fpArm = null, fpHand = null, fpHeld = null;
 let yaw = 0, pitch = 0;   // camera orientation (consumed from commands)
+let cameraMode = 'first'; // 'first' (default) | 'third'
+let heldId = -1;          // item id currently shown in the first-person hand
 export function getYaw() { return yaw; }
 export function getPitch() { return pitch; }
+export function getCameraMode() { return cameraMode; }
+
+/** Toggles between first-person (default) and third-person views. */
+export function toggleCameraMode() {
+  cameraMode = cameraMode === 'first' ? 'third' : 'first';
+  if (character) character.visible = (cameraMode === 'third');
+  refreshFpVisibility();
+  updateCameraTransform();
+}
+
+/** Shows the held view-model only in first-person with a non-empty selection. */
+function refreshFpVisibility() {
+  const show = (cameraMode === 'first') && (heldId && heldId !== AIR);
+  if (fpArm) fpArm.visible = show;
+}
 
 /** Player AABB overlaps any solid voxel? */
 function collides() {
@@ -74,6 +93,103 @@ function makeCharacter() {
   return { group: g, rArm: rArmG };
 }
 
+/** Builds the first-person view-model: a hand anchored to the camera plus a
+ * swappable `fpHeld` group that shows the currently selected hotbar item. */
+function makeFirstPersonArm() {
+  const THREE = getTHREE();
+  const g = new THREE.Group();
+  const skin = [0.78, 0.58, 0.45];
+  const arm = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.5, 0.12),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(skin[0], skin[1], skin[2]) }));
+  arm.position.set(0, -0.25, 0); g.add(arm);
+  const hand = new THREE.Group(); hand.position.set(0, -0.5, 0); g.add(hand);
+  const held = new THREE.Group(); hand.add(held);
+  g.position.set(0.34, -0.30, -0.6); // lower-right of the view
+  g.visible = false;
+  return { group: g, hand, held };
+}
+
+function fpMat(c) { const THREE = getTHREE(); return new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]) }); }
+function fpBox(w, h, d, c, x, y, z, parent) {
+  const THREE = getTHREE();
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), fpMat(c));
+  m.position.set(x, y, z); parent.add(m); return m;
+}
+const WOOD_C = [0.55, 0.40, 0.25], IRON_C = [0.72, 0.72, 0.78], FLAME_C = [1.0, 0.82, 0.30];
+
+function buildPick(group) {
+  fpBox(0.05, 0.5, 0.05, WOOD_C, 0, -0.25, 0, group);
+  fpBox(0.24, 0.09, 0.09, IRON_C, 0, -0.5, 0.04, group);
+}
+function buildSword(group) {
+  fpBox(0.05, 0.5, 0.05, IRON_C, 0, -0.3, 0, group);
+  fpBox(0.16, 0.05, 0.05, WOOD_C, 0, -0.06, 0, group);
+}
+function buildTorch(group) {
+  fpBox(0.05, 0.4, 0.05, WOOD_C, 0, -0.2, 0, group);
+  fpBox(0.12, 0.18, 0.12, FLAME_C, 0, -0.02, 0, group);
+}
+function hexToRgb(h) {
+  const n = parseInt(h.slice(1), 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+}
+function buildHeldBlock(group, id) {
+  const c = BLOCK_SWATCH[id] ? hexToRgb(BLOCK_SWATCH[id]) : [0.6, 0.6, 0.6];
+  fpBox(0.3, 0.3, 0.3, c, 0, -0.25, 0, group);
+}
+
+/** Rebuilds the first-person held model for the given item id (0 = empty). */
+export function setHeldItem(id) {
+  if (!fpHeld || id === heldId) return;
+  heldId = id;
+  while (fpHeld.children.length) fpHeld.remove(fpHeld.children[0]);
+  if (id === WOOD_PICK || id === STONE_PICK) buildPick(fpHeld);
+  else if (id === WOOD_SWORD || id === STONE_SWORD) buildSword(fpHeld);
+  else if (id === TORCH) buildTorch(fpHeld);
+  else if (id && BLOCK_SWATCH[id]) buildHeldBlock(fpHeld, id);
+  else if (id) buildHeldBlock(fpHeld, 0); // generic (gray) fallback
+  refreshFpVisibility();
+}
+
+/** Highest solid block in a column, or −1 if the column is empty. */
+function topSolidAt(x, z) {
+  for (let y = SY - 1; y >= 0; y--) if (SOLID.has(getBlock(x, y, z))) return y;
+  return -1;
+}
+
+/** Would the player's AABB be free if centred at (cx,cz) with feet at footY? */
+function aabbClear(cx, cz, footY) {
+  const minx = Math.floor(cx - 0.3), maxx = Math.floor(cx + 0.3);
+  const miny = Math.floor(footY),     maxy = Math.floor(footY + 1.8);
+  const minz = Math.floor(cz - 0.3), maxz = Math.floor(cz + 0.3);
+  for (let x = minx; x <= maxx; x++)
+    for (let y = miny; y <= maxy; y++)
+      for (let z = minz; z <= maxz; z++) {
+        if (x < 0 || z < 0 || x >= SX || z >= SZ) return false;
+        if (y < 0) return false;
+        if (SOLID.has(getBlock(x, y, z))) return false;
+      }
+  return true;
+}
+
+/** Searches outward from (sx,sz) for a column whose surface + 2-block pocket
+ * is clear of solids (e.g. avoids spawning inside a tree trunk). */
+function findSpawn(sx, sz) {
+  for (let r = 0; r <= 24; r++) {
+    for (let dx = -r; dx <= r; dx++)
+      for (let dz = -r; dz <= r; dz++) {
+        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue; // ring only
+        const x = sx + dx, z = sz + dz;
+        const yt = topSolidAt(x, z);
+        if (yt < 0) continue;
+        const cx = x + 0.5, cz = z + 0.5, footY = yt + 1;
+        if (aabbClear(cx, cz, footY)) return { x: cx, y: footY, z: cz };
+      }
+  }
+  return { x: sx + 0.5, y: SY, z: sz + 0.5 };
+}
+
 /** Creates the player, drops them to the surface, builds the avatar. */
 export function initPlayer() {
   const THREE = getTHREE();
@@ -82,34 +198,52 @@ export function initPlayer() {
   player.onGround = false;
   player.health = 100;
 
-  for (let y = SY - 1; y > 0; y--) {
-    if (SOLID.has(getBlock(Math.floor(player.pos.x), y, Math.floor(player.pos.z)))) {
-      player.pos.y = y + 1; break;
-    }
-  }
+  const spot = findSpawn(Math.floor(SX / 2), Math.floor(SZ / 2));
+  player.pos.set(spot.x, spot.y, spot.z);
   spawnPos = player.pos.clone();
 
   const c = makeCharacter();
   character = c.group;
   rArm = c.rArm;
   scene.current.add(character);
+
+  const f = makeFirstPersonArm();
+  fpArm = f.group;
+  fpHand = f.hand;
+  fpHeld = f.held;
+  camera.current.add(fpArm);   // arm follows the camera in first-person
+  refreshFpVisibility();
+  character.visible = (cameraMode === 'third');
+
   updateCameraTransform();
 }
 
 /** Triggers the pickaxe swing animation. */
 export function triggerSwing() { swing = 1; }
 
-/** Moves the third-person camera behind the player, pulling in near walls. */
+/** Positions the camera for the active mode (third-person orbit or
+ * first-person eye view). */
 export function updateCameraTransform() {
-  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
   const headX = player.pos.x * SCALE, headY = (player.pos.y + EYE) * SCALE, headZ = player.pos.z * SCALE;
-  const dist = 0.45;
-  let ox = -fx * dist * Math.cos(pitch);
-  let oy = 0.2 - Math.sin(pitch) * dist;
-  let oz = -fz * dist * Math.cos(pitch);
+
+  if (cameraMode === 'first') {
+    const fx = -Math.sin(yaw) * Math.cos(pitch);
+    const fy = Math.sin(pitch);
+    const fz = -Math.cos(yaw) * Math.cos(pitch);
+    camera.current.position.set(headX, headY, headZ);
+    camera.current.lookAt(headX + fx, headY + fy, headZ + fz);
+    return;
+  }
+
+  // Third-person: orbit camera behind the player, pulling in near walls.
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  const behind = 4.0, up = 1.4; // ~4 blocks back, ~1.4 up (DESIGN: 3–5 behind)
+  let ox = -fx * behind * SCALE;
+  let oy = up * SCALE - Math.sin(pitch) * behind * SCALE;
+  let oz = -fz * behind * SCALE;
   let len = Math.hypot(ox, oy, oz), tries = 0;
-  while (solidAt(headX + ox, headY + oy, headZ + oz) && len > 0.12 && tries < 12) {
-    ox *= 0.7; oy *= 0.7; oz *= 0.7; len *= 0.7; tries++;
+  while (solidAt(headX + ox, headY + oy, headZ + oz) && len > 0.1 && tries < 16) {
+    ox *= 0.8; oy *= 0.8; oz *= 0.8; len *= 0.8; tries++;
   }
   camera.current.position.set(headX + ox, headY + oy, headZ + oz);
   camera.current.lookAt(headX, headY, headZ);
@@ -123,6 +257,7 @@ export function updateCharacter(dt) {
   if (swing > 0) swing = Math.max(0, swing - dt * 3);
   character.position.y += (moving ? Math.sin(walkPhase) * 0.04 : 0) * SCALE;
   rArm.rotation.x = -swing * 1.8 + (moving ? Math.sin(walkPhase) * 0.3 : 0);
+  if (fpArm) fpHand.rotation.x = -swing * 1.6 + (moving ? Math.sin(walkPhase) * 0.25 : 0);
 }
 
 /** Advances player physics by dt seconds. */
