@@ -491,7 +491,7 @@ const spawnPos = player.pos.clone();
 // ---------------------------------------------------------------------------
 function makeCharacter() {
   const g = new THREE.Group();
-  const mat = c => new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]) });
+  const mat = c => new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]), side: THREE.DoubleSide });
   const box = (w, h, d, col, x, y, z) => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(col));
     m.position.set(x, y, z); g.add(m); return m;
@@ -553,7 +553,7 @@ updateCameraTransform();
 // ---------------------------------------------------------------------------
 function makeCreeper() {
   const g = new THREE.Group();
-  const mat = c => new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]) });
+  const mat = c => new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]), side: THREE.DoubleSide });
   const box = (w, h, d, col, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(col)); m.position.set(x, y, z); g.add(m); return m; };
   const green = [0.24, 0.55, 0.20];
   box(0.5, 0.9, 0.3, green, 0, 0.85, 0);   // body
@@ -568,7 +568,7 @@ function makeCreeper() {
 }
 function makeSheep() {
   const g = new THREE.Group();
-  const mat = c => new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]) });
+  const mat = c => new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]), side: THREE.DoubleSide });
   const box = (w, h, d, col, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(col)); m.position.set(x, y, z); g.add(m); return m; };
   const wool = [0.92, 0.92, 0.95], dark = [0.25, 0.25, 0.28];
   box(0.6, 0.5, 0.9, wool, 0, 0.7, 0);     // body
@@ -813,15 +813,17 @@ function placeBlock() {
     if (getBlock(x, y, z) === AIR && !inPlayer(x, y, z)) { setBlock(x, y, z, BLOCKS[selected]); rebuildAt(x, y, z); playPlace(); }
 }
 
+let downTime = 0;
 renderer.domElement.addEventListener('mousedown', e => {
   if (!playing || !target) return;
-  if (e.button === 0) { mouseDown = true; moved = 0; }
+  if (e.button === 0) { mouseDown = true; moved = 0; downTime = performance.now(); }
   else if (e.button === 2) { placeBlock(); }
 });
 addEventListener('mouseup', e => {
   if (e.button === 0 && mouseDown) {
     mouseDown = false;
-    if (moved < 16 && target) breakBlock(); // a click, not a look-drag
+    // short press = break; long hold = look-drag (no break)
+    if (performance.now() - downTime < 250 && target) breakBlock();
   }
 });
 renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
