@@ -93,6 +93,31 @@ try {
   updateEntities(0.016, false);
   updateEntities(0.016, true);
   console.log(`ENTITIES OK (${entities.length} mobs)`);
+
+  // Biomes: sampling a grid must yield multiple biome types (variety).
+  const { biomeAt } = await import('../src/world/biomes/biomes.js');
+  const seen = new Set();
+  for (let x = 0; x < 250; x += 7) for (let z = 0; z < 250; z += 7) seen.add(biomeAt(x, z).id);
+  if (seen.size < 2) throw new Error('biomes did not vary');
+  console.log(`BIOMES OK (${seen.size} types)`);
+
+  // Lighting: a torch (block 9) at depth produces bright block light while a
+  // deep block stays dark.
+  const { world: w2 } = await import('../src/world/world.js');
+  w2.loadChunk(2, 2);
+  const cx = 2 * 16, cz = 2 * 16;
+  w2.setBlock(cx + 8, 40, cz + 8, 9); // torch
+  if (w2.getLight(cx + 8, 40, cz + 8) < 14) throw new Error('torch did not emit light');
+  if (w2.getLight(cx + 8, 20, cz + 8) >= 14) throw new Error('deep block should be dark');
+  console.log('LIGHTING OK');
+
+  // Save: chunks round-trip through encode/decode without data loss.
+  const { encodeChunk, decodeChunk } = await import('../src/world/save/save.js');
+  const c = w2.getChunk(2, 2);
+  const decoded = decodeChunk(encodeChunk(c));
+  if (decoded.cx !== 2 || decoded.cz !== 2) throw new Error('save header mismatch');
+  for (let i = 0; i < c.data.length; i++) if (decoded.data[i] !== c.data[i]) throw new Error('save data mismatch');
+  console.log('SAVE OK');
 } catch (e) {
   console.error('BOOT FAIL:', e);
   process.exit(1);

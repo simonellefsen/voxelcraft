@@ -14,7 +14,7 @@ const ATLAS = TILE * GRID; // 64×64 px
 // Tile indices
 export const TILES = {
   GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, SAND: 4,
-  WOOD_TOP: 5, WOOD_SIDE: 6, LEAVES: 7, GLASS: 8, WATER: 9,
+  WOOD_TOP: 5, WOOD_SIDE: 6, LEAVES: 7, GLASS: 8, WATER: 9, TORCH: 10,
 };
 
 function rng(seed) {
@@ -100,6 +100,12 @@ export function generateAtlas() {
   });
   // WATER
   drawTile(ctx, TILES.WATER, c => noiseTile(c, 0x3f80d0, 0, 19));
+  // TORCH (stick + flame), emissive
+  drawTile(ctx, TILES.TORCH, c => {
+    c.fillStyle = '#5a3f22'; c.fillRect(7, 7, 2, 8);
+    c.fillStyle = '#ffd24d'; c.fillRect(6, 3, 4, 5);
+    c.fillStyle = '#ff8a1f'; c.fillRect(7, 4, 2, 4);
+  });
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.magFilter = THREE.NearestFilter;
@@ -148,6 +154,7 @@ export function tileFor(id, dir) {
     case 6: return TILES.LEAVES;
     case 7: return TILES.GLASS;
     case 8: return TILES.WATER;
+    case 9: return TILES.TORCH;
     default: return TILES.DIRT;
   }
 }

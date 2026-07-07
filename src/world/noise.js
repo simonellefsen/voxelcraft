@@ -45,3 +45,19 @@ export function fractal(x, y) {
   }
   return sum / norm;
 }
+
+/**
+ * Deterministic hash -> [0,1). Stateless, so terrain features (trees, ore)
+ * are reproducible from world coordinates + an optional salt. Used instead of
+ * Math.random() so generation is seed-stable (DESIGN.md "generated from a
+ * deterministic seed").
+ * @param {number} x
+ * @param {number} z
+ * @param {number} [salt]
+ */
+export function rand2(x, z, salt = 0) {
+  let h = (x | 0) * 374761393 + (z | 0) * 668265263 + (salt | 0) * 2147483647;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h = h ^ (h >>> 16);
+  return ((h >>> 0) % 100000) / 100000;
+}

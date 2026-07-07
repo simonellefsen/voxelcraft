@@ -4,7 +4,7 @@
 // effective on. Keeps gameplay data out of the engine (DESIGN.md "Items and
 // Tools should be data-driven whenever possible").
 
-import { GRASS, DIRT, STONE, SAND, WOOD, LEAVES, GLASS } from '../../core/config.js';
+import { GRASS, DIRT, STONE, SAND, WOOD, LEAVES, GLASS, TORCH } from '../../core/config.js';
 
 // Tool item ids (kept clear of block ids 0..8).
 export const WOOD_PICK = 20, STONE_PICK = 21, WOOD_SWORD = 22, STONE_SWORD = 23;
@@ -39,6 +39,7 @@ export const ITEMS = {
   [WOOD]:  { name: 'Wood', stack: 64, placeBlock: WOOD, tool: null },
   [LEAVES]:{ name: 'Leaves', stack: 64, placeBlock: LEAVES, tool: null },
   [GLASS]: { name: 'Glass', stack: 64, placeBlock: GLASS, tool: null },
+  [TORCH]: { name: 'Torch', stack: 64, placeBlock: TORCH, tool: null },
   // Tools
   [WOOD_PICK]:  { name: 'Wooden Pickaxe', stack: 1, placeBlock: null,
     tool: { type: 'pickaxe', material: 'wood', speed: 2, durability: 60, effective: new Set([STONE]), damage: 2 } },

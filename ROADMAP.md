@@ -77,10 +77,12 @@ unified command layer so desktop/touch/gamepad share gameplay logic.
 - [x] More mobs with distinct behaviors: zombie (melee), skeleton (ranged arrow), spider (leaper), slime (hopper).
 - [x] Spawn manager (game/entities/spawn.js): per-type caps + day/night gating; mob-drop items.
 
-## Milestone 6 — World systems (PLANNED)
-- [ ] Biomes (plains, forest, desert, ocean, …) with surface/vegetation/spawn tables.
-- [ ] Lighting (block light + sky light propagation).
-- [ ] Save system: binary, compressed, chunk-indexed.
+## Milestone 6 — World systems (shipped)
+- [x] Biomes (`world/biomes/biomes.js`): plains-dominant, deterministic; terrain uses surface/subsurface/tree density.
+- [x] Lighting (`world/lighting/lighting.js`): sky + block-light propagation stored per chunk, applied as per-vertex light in meshing.
+- [x] Torch block (emissive) to demonstrate block light; added to inventory + atlas.
+- [x] Save system (`world/save/save.js`): binary RLE chunk serialization + IndexedDB persistence (feature-detected), restored on boot.
+- [x] Boot-test assertions: biomes vary, torch emits light, save round-trips.
 
 ## Conventions
 - One responsibility per file; ≤400 lines (prefer 150–250).

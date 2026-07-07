@@ -92,6 +92,7 @@ export function updateDiagnostics(d) {
     `Player: (${d.px.toFixed(1)}, ${d.py.toFixed(1)}, ${d.pz.toFixed(1)})\n` +
     `Chunks: ${d.chunks}\n` +
     `Mobs: ${d.mobs || 0}\n` +
+    `Biome: ${d.biome || 'Plains'}\n` +
     `Target: ${d.target || 'none'}`;
 }
 

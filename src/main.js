@@ -14,6 +14,8 @@ import { TimeOfDay } from './engine/time.js';
 import { initPlayer, player, move, updateCharacter } from './game/player.js';
 import { spawnEntities, updateEntities, entities } from './game/entities.js';
 import { updateDrops } from './game/entities/drops.js';
+import { restoreWorld, persistWorld } from './world/save/save.js';
+import { biomeAt, biomeName } from './world/biomes/biomes.js';
 import {
   initInteraction, tickInteractions, getSelectedName, getTargetLabel,
 } from './game/interaction.js';
@@ -32,8 +34,10 @@ window.addEventListener('unhandledrejection', e => showError((e.reason && e.reas
     // Build the texture atlas + materials before any chunk is meshed.
     initMaterials();
 
-    // Load the spawn region synchronously so the player has ground; the rest
-    // streams in via updateVisibleChunks() + processQueue() each frame.
+    // Restore any saved chunks, then ensure the spawn region is ready. Restored
+    // chunks keep their saved data (loadChunk skips generation for them); gaps
+    // are generated normally. The rest streams in each frame.
+    await restoreWorld(world).catch(() => 0);
     world.loadArea(SX / 2, SZ / 2, 4);
 
     initRenderer();
@@ -43,6 +47,18 @@ window.addEventListener('unhandledrejection', e => showError((e.reason && e.reas
     initInteraction();
     initUI();
     spawnEntities();
+
+    // Manual save (O) — persists all loaded chunks to IndexedDB.
+    window.addEventListener('keydown', async (e) => {
+      if (e.key === 'o' || e.key === 'O') {
+        const ok = await persistWorld(world).catch(() => false);
+        if (ok) console.log('[save] world persisted');
+      }
+    });
+    // Best-effort autosave when the tab is hidden/closed.
+    window.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') persistWorld(world).catch(() => {});
+    });
 
     const time = new TimeOfDay();
     startLoop(time);
@@ -92,6 +108,7 @@ function startLoop(time) {
        chunks: world.chunks.size,
       faces,
       mobs: entities.length,
+      biome: biomeName(biomeAt(player.pos.x, player.pos.z).id),
       time: formatTime(time.t),
       target: getTargetLabel(),
     });

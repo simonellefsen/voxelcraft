@@ -5,7 +5,7 @@
 // No rendering code lives here — only data + a color lookup the mesher uses.
 
 export const AIR = 0, GRASS = 1, DIRT = 2, STONE = 3, SAND = 4,
-  WOOD = 5, LEAVES = 6, GLASS = 7, WATER = 8;
+  WOOD = 5, LEAVES = 6, GLASS = 7, WATER = 8, TORCH = 9;
 
 /**
  * @typedef {Object} BlockDef
@@ -28,6 +28,7 @@ export const BLOCK_DEFS = [
   { id: LEAVES,name: 'Leaves',solid: true,  opaque: true,  transparent: false, color: [0.27, 0.55, 0.23] },
   { id: GLASS, name: 'Glass', solid: true,  opaque: false, transparent: true,  color: [0.72, 0.86, 0.92] },
   { id: WATER, name: 'Water', solid: false, opaque: false, transparent: true,  color: [0.25, 0.50, 0.92] },
+  { id: TORCH, name: 'Torch', solid: true,  opaque: true,  transparent: false, color: [1.00, 0.80, 0.35], emits: 15 },
 ];
 
 /** True if the block id is solid (blocks movement). */
@@ -38,6 +39,9 @@ export function isOpaque(id) { return !!BLOCK_DEFS[id] && BLOCK_DEFS[id].opaque;
 
 /** True if the block renders in the transparent pass. */
 export function isTransparent(id) { return !!BLOCK_DEFS[id] && BLOCK_DEFS[id].transparent; }
+
+/** Light level (0..15) emitted by a block, for the lighting subsystem. */
+export function emits(id) { return (BLOCK_DEFS[id] && BLOCK_DEFS[id].emits) || 0; }
 
 /** Display name for a block id. */
 export function blockName(id) { return (BLOCK_DEFS[id] && BLOCK_DEFS[id].name) || 'Air'; }

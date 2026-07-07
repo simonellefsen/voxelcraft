@@ -11,6 +11,7 @@ import { SX, SY, SZ, CHUNK, AIR } from '../core/config.js';
 import { Chunk, ChunkState } from './chunks/chunk.js';
 import { buildChunk } from './meshing.js';
 import { generateTerrain } from './terrain.js';
+import { computeChunkLight, getCombinedLight } from './lighting/lighting.js';
 
 export { Chunk, ChunkState };
 
@@ -39,6 +40,9 @@ export class World {
     return c.get(x - cx * CHUNK, y, z - cz * CHUNK);
   }
 
+  /** Combined light (0..15) at a world coordinate; 15 if light is uncomputed. */
+  getLight(x, y, z) { return getCombinedLight(this, x, y, z); }
+
   /** Sets a block globally, creating its chunk if needed, and marks it dirty. */
   setBlock(x, y, z, v) {
     if (x < 0 || y < 0 || z < 0 || x >= SX || y >= SY || z >= SZ) return;
@@ -46,6 +50,17 @@ export class World {
     const c = this.getChunk(cx, cz) || this.ensureChunk(cx, cz);
     c.set(x - cx * CHUNK, y, z - cz * CHUNK, v);
     this.markNeighboursDirty(cx, cz);
+    // Only relight on edits to already-generated chunks; during initial
+    // generation (state EMPTY) light is computed once in loadChunk.
+    if (c.state !== ChunkState.EMPTY) this.recomputeLightAround(cx, cz);
+  }
+
+  /** Recomputes light for a chunk and its 4 neighbours after an edit. */
+  recomputeLightAround(cx, cz) {
+    for (const [dx, dz] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const c = this.getChunk(cx + dx, cz + dz);
+      if (c) computeChunkLight(this, c);
+    }
   }
 
   /** Creates an empty chunk if absent. */
@@ -69,6 +84,7 @@ export class World {
     const c = this.ensureChunk(cx, cz);
     if (c.state === ChunkState.MESHED) return c;
     if (c.state === ChunkState.EMPTY) { generateTerrain(this, c); c.state = ChunkState.GENERATED; }
+    computeChunkLight(this, c);
     c.meshes = buildChunk(this, c);
     c.state = ChunkState.MESHED;
     c.dirty = false;

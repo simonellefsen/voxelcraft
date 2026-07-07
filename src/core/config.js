@@ -3,13 +3,13 @@
 // world/blocks/block.js and re-exported here so legacy imports keep working.
 
 import {
-  AIR, GRASS, DIRT, STONE, SAND, WOOD, LEAVES, GLASS, WATER,
+  AIR, GRASS, DIRT, STONE, SAND, WOOD, LEAVES, GLASS, WATER, TORCH,
   isSolid, isOpaque, isTransparent, blockName, blockColor, BLOCK_DEFS,
 } from '../world/blocks/block.js';
 
 // ---- Block ids (re-exported from the registry) ----
 export {
-  AIR, GRASS, DIRT, STONE, SAND, WOOD, LEAVES, GLASS, WATER,
+  AIR, GRASS, DIRT, STONE, SAND, WOOD, LEAVES, GLASS, WATER, TORCH,
   isSolid, isOpaque, isTransparent, blockName, blockColor, BLOCK_DEFS,
 };
 
@@ -27,7 +27,7 @@ export const BLOCK_NAMES = Object.fromEntries(BLOCK_DEFS.map(b => [b.id, b.name]
 /** Hex swatches for the hotbar UI. */
 export const BLOCK_SWATCH = {
   [GRASS]: '#6cb84d', [DIRT]: '#80603d', [STONE]: '#8f8f99', [SAND]: '#dcc88f',
-  [WOOD]: '#6b4d2b', [LEAVES]: '#45a83b', [GLASS]: '#b8dbe8',
+  [WOOD]: '#6b4d2b', [LEAVES]: '#45a83b',   [GLASS]: '#b8dbe8', [TORCH]: '#ffd24d',
 };
 
 // ---- World dimensions ----

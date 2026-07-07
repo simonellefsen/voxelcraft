@@ -27,6 +27,10 @@ export class Chunk {
     this.state = ChunkState.EMPTY;
     /** @type {{opaque: any, transparent: any} | null} */
     this.meshes = null;
+    /** @type {Uint8Array | null} sky light (0..15), filled by lighting.js */
+    this.sky = null;
+    /** @type {Uint8Array | null} block light (0..15), filled by lighting.js */
+    this.blk = null;
   }
 
   /** Flat local index for (x,y,z) in [0,CHUNK)×[0,SY)×[0,CHUNK). */

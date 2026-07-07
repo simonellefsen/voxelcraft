@@ -14,9 +14,9 @@ let atlas = null;
 export function initMaterials() {
   const THREE = getTHREE();
   atlas = generateAtlas();
-  opaqueMat = new THREE.MeshBasicMaterial({ map: atlas.texture });
+  opaqueMat = new THREE.MeshBasicMaterial({ map: atlas.texture, vertexColors: true });
   transMat = new THREE.MeshBasicMaterial({
-    map: atlas.texture, transparent: true, opacity: 0.6,
+    map: atlas.texture, transparent: true, opacity: 0.6, vertexColors: true,
   });
 }
 

@@ -2,9 +2,9 @@
 // Builds Three.js geometry for a chunk from the World store. Two strategies:
 //   buildChunk      — face culling (default, proven)
 //   buildChunkGreedy — greedy meshing (benchmarked; fewer triangles)
-// Both emit positions + UVs (no vertex colors); the renderer applies the
-// shared atlas materials. Neighbour lookups use world.getBlock so chunk
-// borders cull correctly.
+// Both emit positions + UVs + a per-vertex light color (from world.getLight)
+// so caves are dark and torches glow without per-light uniforms. Neighbour
+// lookups use world.getBlock so chunk borders cull correctly.
 
 import { SCALE, CHUNK, SY } from '../core/config.js';
 import { getTHREE } from '../core/three.js';
@@ -20,10 +20,17 @@ const FACES = [
   { dir: [ 0, 0,-1], corners: [[0,0,0],[0,1,0],[1,1,0],[1,0,0]] },
 ];
 
-function makeGeometry(THREE, positions, uvs, indices) {
+/** Maps a 0..15 light level to a [0.3,1] grayscale vertex color. */
+function lightBrightness(world, x, y, z) {
+  const L = world.getLight(x, y, z);
+  return 0.3 + 0.7 * (L / 15);
+}
+
+function makeGeometry(THREE, positions, uvs, colors, indices) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   g.setIndex(indices);
   return g;
 }
@@ -33,8 +40,8 @@ export function buildChunk(world, chunk) {
   const THREE = getTHREE();
   const atlas = getAtlas();
   const x0 = chunk.cx * CHUNK, z0 = chunk.cz * CHUNK;
-  const op = [], oc = [], oi = [];   // oc holds uvs here
-  const tr = [], tc = [], ti = [];
+  const op = [], oc = [], ol = [], oi = [];   // ol = light colors, oc = uvs
+  const tr = [], tc = [], tl = [], ti = [];
 
   for (let z = 0; z < CHUNK; z++)
     for (let y = 0; y < SY; y++)
@@ -43,7 +50,9 @@ export function buildChunk(world, chunk) {
         if (id === 0) continue;
         const gx = x0 + x, gz = z0 + z;
         const transparent = isTransparent(id);
-        const arr = transparent ? tr : op, uar = transparent ? tc : oc, iarr = transparent ? ti : oi;
+        const arr = transparent ? tr : op, uar = transparent ? tc : oc,
+              lar = transparent ? tl : ol, iarr = transparent ? ti : oi;
+        const b = lightBrightness(world, gx, y, gz);
         for (const f of FACES) {
           const nb = world.getBlock(gx + f.dir[0], y + f.dir[1], gz + f.dir[2]);
           const visible = transparent ? (nb === 0) : !isOpaque(nb);
@@ -54,13 +63,14 @@ export function buildChunk(world, chunk) {
             arr.push((gx + f.corners[i][0]) * SCALE, (y + f.corners[i][1]) * SCALE, (gz + f.corners[i][2]) * SCALE);
             uar.push(i === 0 ? uv[0] : i === 1 ? uv[2] : uv[2],
                      i === 0 ? uv[1] : i === 1 ? uv[1] : uv[3]);
+            lar.push(b, b, b);
           }
           iarr.push(base, base + 1, base + 2, base, base + 2, base + 3);
         }
       }
 
-  const opaque = op.length ? makeGeometry(THREE, op, oc, oi) : null;
-  const transparent = tr.length ? makeGeometry(THREE, tr, tc, ti) : null;
+  const opaque = op.length ? makeGeometry(THREE, op, oc, ol, oi) : null;
+  const transparent = tr.length ? makeGeometry(THREE, tr, tc, tl, ti) : null;
   return { opaque, transparent };
 }
 
@@ -99,7 +109,7 @@ function anchor(dir, L, iu, iv, x0, z0) {
   return [ox, oy, oz];
 }
 
-function emitQuad(pos, uvs, idx, u, v, ox, oy, oz, su, sv, uvTile) {
+function emitQuad(pos, uvs, cols, idx, u, v, ox, oy, oz, su, sv, uvTile, b) {
   const corner = (ku, kv) => {
     let x = ox, y = oy, z = oz;
     if (u === 'x') x += ku; else if (u === 'y') y += ku; else z += ku;
@@ -110,6 +120,7 @@ function emitQuad(pos, uvs, idx, u, v, ox, oy, oz, su, sv, uvTile) {
   const base = pos.length / 3;
   pos.push(...c0, ...c1, ...c2, ...c3);
   uvs.push(uvTile[0], uvTile[1], uvTile[2], uvTile[1], uvTile[2], uvTile[3], uvTile[0], uvTile[3]);
+  cols.push(b, b, b, b, b, b, b, b, b, b, b, b);
   idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
 }
 
@@ -119,8 +130,8 @@ export function buildChunkGreedy(world, chunk) {
   const atlas = getAtlas();
   const x0 = chunk.cx * CHUNK, z0 = chunk.cz * CHUNK;
 
-  const op = { pos: [], uv: [], idx: [] };
-  const tr = { pos: [], uv: [], idx: [] };
+  const op = { pos: [], uv: [], col: [], idx: [] };
+  const tr = { pos: [], uv: [], col: [], idx: [] };
 
   for (const dir of DIRS) {
     const n = dir.n, u = dir.u, v = dir.v;
@@ -153,7 +164,9 @@ export function buildChunkGreedy(world, chunk) {
           const tgt = isTransparent(id) ? tr : op;
           const uvTile = atlas.uv(tileFor(id, n));
           const a = anchor(dir, L, uu, vv, x0, z0);
-          emitQuad(tgt.pos, tgt.uv, tgt.idx, u, v, a[0], a[1], a[2], w, h, uvTile);
+          // Use the light of the representative block for the whole quad.
+          const b = lightBrightness(world, a[0], a[1], a[2]);
+          emitQuad(tgt.pos, tgt.uv, tgt.col, tgt.idx, u, v, a[0], a[1], a[2], w, h, uvTile, b);
           for (let dv = 0; dv < h; dv++) for (let du = 0; du < w; du++) mask[vv + dv][uu + du] = 0;
           uu += w;
         }
@@ -162,7 +175,7 @@ export function buildChunkGreedy(world, chunk) {
     }
   }
 
-  const opaque = op.pos.length ? makeGeometry(THREE, op.pos, op.uv, op.idx) : null;
-  const transparent = tr.pos.length ? makeGeometry(THREE, tr.pos, tr.uv, tr.idx) : null;
+  const opaque = op.pos.length ? makeGeometry(THREE, op.pos, op.uv, op.col, op.idx) : null;
+  const transparent = tr.pos.length ? makeGeometry(THREE, tr.pos, tr.uv, tr.col, tr.idx) : null;
   return { opaque, transparent };
 }
