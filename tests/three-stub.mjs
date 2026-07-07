@@ -5,6 +5,10 @@ const V3 = class {
   copy(v) { this.x = v.x; this.y = v.y; this.z = v.z; return this; }
   clone() { return new V3(this.x, this.y, this.z); }
   normalize() { const l = Math.hypot(this.x, this.y, this.z) || 1; this.x /= l; this.y /= l; this.z /= l; return this; }
+  multiplyScalar(s) { this.x *= s; this.y *= s; this.z *= s; return this; }
+  add(v) { this.x += v.x; this.y += v.y; this.z += v.z; return this; }
+  sub(v) { this.x -= v.x; this.y -= v.y; this.z -= v.z; return this; }
+  addScaledVector(v, s) { this.x += v.x * s; this.y += v.y * s; this.z += v.z * s; return this; }
   lengthSq() { return this.x * this.x + this.y * this.y + this.z * this.z; }
   distanceTo(v) { return Math.hypot(this.x - v.x, this.y - v.y, this.z - v.z); }
 };

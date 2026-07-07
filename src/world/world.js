@@ -11,7 +11,7 @@ import { SX, SY, SZ, CHUNK, AIR } from '../core/config.js';
 import { Chunk, ChunkState } from './chunks/chunk.js';
 import { buildChunk } from './meshing.js';
 import { generateTerrain } from './terrain.js';
-import { computeChunkLight, getCombinedLight } from './lighting/lighting.js';
+import { computeChunkLight, getCombinedLight, getSkyLight, getBlockLight } from './lighting/lighting.js';
 
 export { Chunk, ChunkState };
 
@@ -42,6 +42,10 @@ export class World {
 
   /** Combined light (0..15) at a world coordinate; 15 if light is uncomputed. */
   getLight(x, y, z) { return getCombinedLight(this, x, y, z); }
+  /** Sky-light channel (0..15) only. */
+  getSkyLight(x, y, z) { return getSkyLight(this, x, y, z); }
+  /** Block-light channel (0..15) only; 0 if uncomputed. */
+  getBlockLight(x, y, z) { return getBlockLight(this, x, y, z); }
 
   /** Sets a block globally, creating its chunk if needed, and marks it dirty. */
   setBlock(x, y, z, v) {

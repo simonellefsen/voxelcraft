@@ -89,3 +89,23 @@ export function getCombinedLight(world, x, y, z) {
   const li = lx + CHUNK * (y + SY * lz);
   return Math.max(c.sky[li], c.blk[li]);
 }
+
+/** Sky-light channel only (0..15) at a world coordinate. */
+export function getSkyLight(world, x, y, z) {
+  const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK);
+  const c = world.getChunk(cx, cz);
+  if (!c || !c.sky) return MAX;
+  const lx = x - cx * CHUNK, lz = z - cz * CHUNK;
+  if (y < 0 || y >= SY || lx < 0 || lx >= CHUNK || lz < 0 || lz >= CHUNK) return MAX;
+  return c.sky[lx + CHUNK * (y + SY * lz)];
+}
+
+/** Block-light channel only (0..15) at a world coordinate. */
+export function getBlockLight(world, x, y, z) {
+  const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK);
+  const c = world.getChunk(cx, cz);
+  if (!c || !c.blk) return 0;
+  const lx = x - cx * CHUNK, lz = z - cz * CHUNK;
+  if (y < 0 || y >= SY || lx < 0 || lx >= CHUNK || lz < 0 || lz >= CHUNK) return 0;
+  return c.blk[lx + CHUNK * (y + SY * lz)];
+}

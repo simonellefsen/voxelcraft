@@ -20,10 +20,17 @@ const FACES = [
   { dir: [ 0, 0,-1], corners: [[0,0,0],[0,1,0],[1,1,0],[1,0,0]] },
 ];
 
-/** Maps a 0..15 light level to a [0.3,1] grayscale vertex color. */
+/**
+ * Brightness for a vertex. Sky (sun) gives the base 0.3..1.0 term; block light
+ * (e.g. torches) is added on top and may exceed 1.0. The renderer clamps the
+ * final color, so a torch-lit area stays bright at night even after the
+ * day/night multiplier dims the rest of the scene (glow effect).
+ * @param {import('../world/world.js').World} world @param {number} x @param {number} y @param {number} z
+ */
 function lightBrightness(world, x, y, z) {
-  const L = world.getLight(x, y, z);
-  return 0.3 + 0.7 * (L / 15);
+  const sky = world.getSkyLight(x, y, z) / 15;
+  const blk = world.getBlockLight(x, y, z) / 15;
+  return 0.3 + 0.7 * sky + 1.6 * blk;
 }
 
 function makeGeometry(THREE, positions, uvs, colors, indices) {
